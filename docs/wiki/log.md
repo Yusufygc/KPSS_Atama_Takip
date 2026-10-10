@@ -4,6 +4,15 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-10] WEB DASHBOARD COMPLETE | Modern Web Arayüzü ve FastAPI Entegrasyonu Tamamlandı
+* `web/index.html`, `web/css/style.css` ve `web/js/app.js` modüler istemci yapısıyla kodlandı.
+* UI-Backend mutlak ayrımı sağlandı; arayüz yalnızca `/api/...` REST uç noktalarını tüketiyor.
+* KPSS P3 (Lisans) ve P1/P2 (Kariyer) hızlı filtre butonları, unvan arama, portal seçici eklendi.
+* Canlı "Şimdi Tara" butonu, anlık toast bildirimleri ve 6 portalın sağlık durumunu gösteren alt panel entegre edildi.
+* Telegram yapılandırma ve anlık test bildirimi gönderen ayarlar modalı hayata geçirildi.
+* FastAPI statik dosya sunumu (`/`, `/css/...`, `/js/...`) `aiofiles` ile asenkron bağlandı ve E2E test ile doğrulandı.
+* Bağlantılar: [[architecture]], [[rules]], [[notifications]]
+
 ## [2026-10-10] PHASE 3-6 COMPLETE | Scrapers, KPSS Eşleştirme, Telegram, Servisler ve FastAPI API İnşa Edildi
 * `BaseScraper` ve `ScraperRegistry` mimarisiyle 6 portalın somut adaptörleri kodlandı (Kariyer Kapısı, Resmî Gazete, Kamu İlan SBB, Yerel Yönetimler, İŞKUR, İlan.gov.tr).
 * `ScraperOrchestrator` ile hata izolasyonlu eşzamanlı (asenkron paralel) kazıma motoru hayata geçirildi.

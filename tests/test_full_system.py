@@ -92,6 +92,16 @@ async def run_full_system_tests():
         assert "total" in ann_data
         print(f"   [OK] GET /api/announcements: {len(ann_data['items'])} items returned.")
 
+        # Test Static Web Dashboard
+        web_resp = await client.get("/")
+        assert web_resp.status_code == 200
+        assert "KPSS Atama & İlan Takip" in web_resp.text
+        print("   [OK] GET / (Dashboard HTML) returned 200 OK.")
+
+        css_resp = await client.get("/css/style.css")
+        assert css_resp.status_code == 200
+        print("   [OK] GET /css/style.css returned 200 OK.")
+
     print("=" * 60)
     print("ALL END-TO-END TESTS PASSED SUCCESSFULLY! ✅")
     print("=" * 60)

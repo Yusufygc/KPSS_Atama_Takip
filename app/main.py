@@ -79,6 +79,14 @@ def create_app() -> FastAPI:
             "env": settings.APP_ENV,
         }
 
+    # Web Dashboard (Statik Dosyalar)
+    from pathlib import Path
+    from fastapi.staticfiles import StaticFiles
+
+    web_dir = Path(__file__).resolve().parent.parent / "web"
+    if web_dir.exists():
+        app.mount("/", StaticFiles(directory=str(web_dir), html=True), name="web")
+
     return app
 
 
