@@ -205,6 +205,10 @@ class AnnouncementRepository:
             conditions.append("field_tags LIKE ?")
             sql_params.append(f"%{params.field_tag.strip()}%")
 
+        if params.city:
+            conditions.append("city = ?")
+            sql_params.append(params.city.strip())
+
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         # Toplam eşleşme sayısı sorgusu
@@ -312,3 +316,18 @@ class AnnouncementRepository:
             it_count=it_count,
             by_source=by_source,
         )
+
+    async def get_distinct_cities(self) -> List[Dict[str, Any]]:
+        """Kayıtlı şehirlerin listesini ve her birindeki aktif ilan sayısını döner."""
+        sql = """
+        SELECT city, COUNT(*) as count 
+        FROM announcements 
+        WHERE city IS NOT NULL AND city != ''
+        GROUP BY city 
+        ORDER BY count DESC, city ASC;
+        """
+        async with get_db_connection(self.db_path) as conn:
+            async with conn.execute(sql) as cursor:
+                rows = await cursor.fetchall()
+                return [{"name": row["city"], "count": row["count"]} for row in rows]
+

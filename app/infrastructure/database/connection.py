@@ -40,6 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_announcements_hash ON announcements(hash_id);
 CREATE INDEX IF NOT EXISTS idx_announcements_source ON announcements(source_key);
 CREATE INDEX IF NOT EXISTS idx_announcements_notified ON announcements(is_notified);
 CREATE INDEX IF NOT EXISTS idx_announcements_priority ON announcements(priority_level);
+CREATE INDEX IF NOT EXISTS idx_announcements_city ON announcements(city);
 """
 
 

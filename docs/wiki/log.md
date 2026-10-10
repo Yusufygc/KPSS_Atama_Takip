@@ -4,6 +4,19 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-10] REFACTOR & FEATURE | SVG Vektörel İkonlara Geçildi, Filtre Karmaşası Çözüldü ve Şehir Filtresi Eklendi
+* **Vektörel İkon Mimarisi (`web/js/icons.js`):** Arayüzdeki tüm emojiler kaldırıldı; Lucide ve modern tasarım standartlarında temiz SVG vektörel ikon kütüphanesi entegre edildi.
+* **Filtre Karmaşasının Çözülmesi:** Üst üste yığılan, tekrarlayan ve ekranı boğan 4 sıralı filtreleme yapısı kaldırıldı:
+  - Üstte tek satırlı 12 kolonluk birleşik araç çubuğu oluşturuldu: Arama (temizleme butonlu), Şehir Seçici, Portal Seçici ve Tek Tık Filtre Sıfırlama butonu.
+  - Altta sade kategori sekmesi (Tüm İlanlar, Bölümüm, P3, P1/P2) ve sağda anlık sonuç sayısı yerleştirildi.
+  - Mükerrer olan "Hızlı Arama" satırı kaldırıldı; alt uzmanlık çipleri yalnızca "Bölümüm" sekmesi aktifken gösterilecek şekilde bağlamsal hale getirildi.
+* **Şehir Tespit ve Filtreleme Motoru (`app/core/scoring/city_matcher.py`):**
+  - Türkiye'nin 81 ili, il adı geçmeyen tanınmış devlet üniversiteleri (Atatürk Üni -> Erzurum vb.), merkezi kamu teşkilatları (Bakanlıklar, Başkanlıklar -> Ankara) ve belirgin ilçeler (Eleşkirt -> Ağrı vb.) üzerinden il tespit motoru yazıldı.
+  - SQLite veritabanındaki 241 ilanın tamamı geriye dönük taranarak şehirleri güncellendi ve `idx_announcements_city` indeksi eklendi (Ankara: 74, Türkiye Geneli: 46, İstanbul: 18, Rize: 12, vb.).
+  - `GET /api/announcements/cities` uç noktası ve `GET /api/announcements?city=...` filtreleme parametresi bağlandı.
+* Uçtan uca testler (`tests/test_full_system.py`) güncellendi ve başarıyla geçti.
+* Bağlantılar: [[architecture]], [[rules]], [[kpss_scoring]]
+
 ## [2026-10-10] FEATURE | Bilgisayar Mühendisliği ve Bilişim Odaklı Profesyonel Filtreleme Sistemi Entegre Edildi
 * Kullanıcının bölümü olan **Bilgisayar Mühendisliği** ve kamu sektöründeki ilgili uzmanlık kadrolarını (Yazılım, Siber Güvenlik, Sözleşmeli Bilişim Personeli - SBP, Ağ/Sistem, Çözümleyici, Veri/Yapay Zeka) anında tespit eden `ITFieldMatcher` kural ve regex motoru (`app/core/scoring/it_field_matcher.py`) geliştirildi.
 * Kamudaki 375 sayılı KHK Ek 6. madde kapsamındaki Sözleşmeli Bilişim Personeli (SBP), Bilgisayar Mühendisi, Çözümleyici, Programcı ve Siber Güvenlik ilanları normalize edilmiş Türkçe regex modelleriyle 7 alt uzmanlık etiketine (`ITSubField`) ayrıştırıldı.

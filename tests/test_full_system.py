@@ -14,6 +14,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 from app.core.scoring.strategy import KPSSScoreMatcher
 from app.core.scoring.it_field_matcher import ITFieldMatcher, ITSubField
+from app.core.scoring.city_matcher import CityMatcher
 from app.domain.models import PriorityLevel, ScoreType
 from app.infrastructure.database.connection import init_database
 from app.main import app
@@ -64,6 +65,33 @@ async def run_full_system_tests():
     assert ITSubField.CYBER_SECURITY.value in it_tags
     assert ITFieldMatcher.is_it_announcement(tags=it_tags)
     print(f"   [OK] IT Field Match: {it_tags}")
+
+    # 1.2 Test City Matcher Engine
+    print("1.2 Testing CityMatcher Engine...")
+    c_ankara = CityMatcher.detect_city(
+        title="Sözleşmeli Bilişim Personeli Alımı",
+        institution="Çalışma ve Sosyal Güvenlik Bakanlığı",
+    )
+    assert c_ankara == "Ankara"
+
+    c_izmir = CityMatcher.detect_city(
+        title="İzmir Bakırçay Üniversitesi Sözleşmeli Personel Alımı",
+        institution="İzmir Bakırçay Üniversitesi",
+    )
+    assert c_izmir == "İzmir"
+
+    c_erzurum = CityMatcher.detect_city(
+        title="Atatürk Üniversitesi Sözleşmeli Personel İlanı",
+        institution="Atatürk Üniversitesi Rektörlüğü",
+    )
+    assert c_erzurum == "Erzurum"
+
+    c_agri = CityMatcher.detect_city(
+        title="Eleşkirt Belediye Başkanlığı Zabıta Memuru Alımı",
+        institution="Eleşkirt Belediyesi",
+    )
+    assert c_agri == "Ağrı"
+    print("   [OK] CityMatcher: Ankara, İzmir, Erzurum, Ağrı matched accurately.")
 
     # 2. Test FastAPI Endpoints via Async Client
     print("2. Testing FastAPI REST Endpoints...")
@@ -116,6 +144,22 @@ async def run_full_system_tests():
             assert len(item["field_tags"]) > 0
         print(f"   [OK] GET /api/announcements?only_it=true: {it_data['total']} IT announcements found.")
 
+        # Test /api/announcements/cities
+        cities_resp = await client.get("/api/announcements/cities")
+        assert cities_resp.status_code == 200
+        cities_list = cities_resp.json()
+        assert len(cities_list) >= 10
+        print(f"   [OK] GET /api/announcements/cities: {len(cities_list)} distinct cities listed.")
+
+        # Test /api/announcements with city filter
+        city_resp = await client.get("/api/announcements?city=Ankara&limit=10")
+        assert city_resp.status_code == 200
+        city_data = city_resp.json()
+        assert city_data["total"] >= 1
+        for item in city_data["items"]:
+            assert item["city"] == "Ankara"
+        print(f"   [OK] GET /api/announcements?city=Ankara: {city_data['total']} items in Ankara.")
+
         # Test Document Proxy / View Endpoint
         first_item = ann_data['items'][0]
         first_id = first_item['id']
@@ -123,11 +167,15 @@ async def run_full_system_tests():
         assert doc_resp.status_code in (200, 307)
         print(f"   [OK] GET /api/announcements/{first_id}/document returned {doc_resp.status_code}")
 
-        # Test Static Web Dashboard
+        # Test Static Web Dashboard & SVG Icons JS
         web_resp = await client.get("/")
         assert web_resp.status_code == 200
         assert "KPSS Atama & İlan Takip" in web_resp.text
         print("   [OK] GET / (Dashboard HTML) returned 200 OK.")
+
+        icons_resp = await client.get("/js/icons.js")
+        assert icons_resp.status_code == 200
+        print("   [OK] GET /js/icons.js returned 200 OK.")
 
         css_resp = await client.get("/css/style.css")
         assert css_resp.status_code == 200

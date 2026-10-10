@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple
 
 from app.core.constants.strings import MessageStrings
 from app.core.logging import get_logger
+from app.core.scoring.city_matcher import CityMatcher
 from app.core.scoring.it_field_matcher import ITFieldMatcher
 from app.core.scoring.strategy import KPSSScoreMatcher
 from app.domain.models import Announcement, PriorityLevel, ScoreType
@@ -60,13 +61,21 @@ class AnnouncementService:
                     raw_content=dto.raw_content or "",
                 )
 
+                # 3. Şehir / İl Tespiti ve Normalizasyonu
+                detected_city = CityMatcher.detect_city(
+                    title=dto.title,
+                    institution=dto.institution,
+                    position=dto.position or "",
+                    raw_city=dto.city,
+                )
+
                 entity = Announcement(
                     source_key=dto.source_key,
                     source_name=dto.source_name,
                     title=dto.title,
                     institution=dto.institution,
                     position=dto.position,
-                    city=dto.city,
+                    city=detected_city,
                     url=dto.url,
                     pdf_url=dto.pdf_url,
                     publish_date=dto.publish_date,

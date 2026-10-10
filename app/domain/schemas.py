@@ -101,12 +101,20 @@ class AnnouncementFilterParams(BaseModel):
     score_types: Optional[List[ScoreType]] = None
     source_keys: Optional[List[str]] = None
     search_text: Optional[str] = None
+    city: Optional[str] = None
     only_unnotified: bool = False
     only_p3: bool = False
     only_it: bool = False
     field_tag: Optional[str] = None
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
+
+
+class CityCountResponse(BaseModel):
+    """Şehir adı ve ilgili şehirdeki ilan sayısını içeren DTO."""
+
+    name: str
+    count: int
 
 
 class ScraperRunStatus(BaseModel):

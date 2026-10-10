@@ -16,6 +16,7 @@ from app.domain.models import ScoreType
 from app.domain.schemas import (
     AnnouncementFilterParams,
     AnnouncementResponse,
+    CityCountResponse,
     SystemStatsResponse,
 )
 
@@ -26,6 +27,7 @@ router = APIRouter(prefix="/announcements", tags=["İlanlar"])
 async def list_announcements(
     service: AnnouncementServiceDep,
     search: Optional[str] = Query(None, description="Arama metni"),
+    city: Optional[str] = Query(None, description="Şehir / İl filtresi"),
     score_type: Optional[List[ScoreType]] = Query(None, description="Puan türleri"),
     source_key: Optional[List[str]] = Query(None, description="Kaynak portallar"),
     only_p3: bool = Query(False, description="Sadece öncelikli P3 ilanları"),
@@ -38,6 +40,7 @@ async def list_announcements(
     """Filtrelenmiş ve sayfalanmış KPSS atama ilanlarını döner."""
     params = AnnouncementFilterParams(
         search_text=search,
+        city=city,
         score_types=score_type,
         source_keys=source_key,
         only_p3=only_p3,
@@ -54,6 +57,12 @@ async def list_announcements(
         "limit": limit,
         "offset": offset,
     }
+
+
+@router.get("/cities", response_model=List[CityCountResponse])
+async def list_cities(service: AnnouncementServiceDep):
+    """Aktif ilanlarda geçen şehirleri ve ilan sayılarını döner."""
+    return await service.repository.get_distinct_cities()
 
 
 @router.get("/stats", response_model=SystemStatsResponse)
