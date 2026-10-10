@@ -11,11 +11,16 @@ const state = {
     limit: 20,
     offset: 0,
     total: 0,
-    isScraping: false
+    isScraping: false,
+    theme: localStorage.getItem('kpss_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
 };
 
 // DOM Elemanları
 const el = {
+    // Tema
+    btnThemeToggle: document.getElementById('btnThemeToggle'),
+    themeIcon: document.getElementById('themeIcon'),
+
     // İstatistikler
     statP3Count: document.getElementById('statP3Count'),
     statCareerCount: document.getElementById('statCareerCount'),
@@ -60,10 +65,33 @@ const el = {
     toastContainer: document.getElementById('toastContainer')
 };
 
+// 0. Tema Yönetimi (Dark / Light Mode)
+function applyTheme(theme) {
+    state.theme = theme;
+    localStorage.setItem('kpss_theme', theme);
+    if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        el.themeIcon.textContent = '☀️';
+        el.btnThemeToggle.title = 'Aydınlık Moda Geç';
+    } else {
+        document.documentElement.classList.remove('dark');
+        el.themeIcon.textContent = '🌙';
+        el.btnThemeToggle.title = 'Karanlık Moda Geç';
+    }
+}
+
+function toggleTheme() {
+    const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+    showToast(`Tema değiştirildi: ${nextTheme === 'dark' ? 'Karanlık Mod 🌙' : 'Aydınlık Mod ☀️'}`, 'info');
+}
+
 // Yardımcı: Toast Bildirimi Göster
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
-    const bgClass = type === 'success' ? 'bg-emerald-600 text-white' : (type === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white');
+    const bgClass = type === 'success' 
+        ? 'bg-emerald-600 text-white' 
+        : (type === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-900 dark:bg-slate-800 text-white border border-slate-700');
     toast.className = `toast pointer-events-auto flex items-center space-x-2 px-4 py-3 rounded-xl shadow-lg text-xs font-semibold ${bgClass}`;
     toast.innerHTML = `<span>${type === 'success' ? '✅' : (type === 'error' ? '❌' : 'ℹ️')}</span><span>${message}</span>`;
     
@@ -94,7 +122,7 @@ async function fetchStats() {
 // 2. İlanları Listele
 async function fetchAnnouncements() {
     el.announcementsContainer.innerHTML = `
-        <div class="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-400">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center text-slate-400 dark:text-slate-500">
             <div class="inline-block animate-spin text-2xl mb-2">⏳</div>
             <p class="text-xs font-medium">İlanlar yükleniyor...</p>
         </div>
@@ -125,7 +153,7 @@ async function fetchAnnouncements() {
         updatePagination(data.total);
     } catch (err) {
         el.announcementsContainer.innerHTML = `
-            <div class="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center text-rose-700 text-xs">
+            <div class="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-2xl p-6 text-center text-rose-700 dark:text-rose-300 text-xs">
                 ❌ İlanlar getirilirken bir hata oluştu: ${err.message}
             </div>
         `;
@@ -138,10 +166,10 @@ function renderAnnouncements(items) {
 
     if (items.length === 0) {
         el.announcementsContainer.innerHTML = `
-            <div class="bg-white border border-slate-200 rounded-2xl p-12 text-center text-slate-500 space-y-3">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center text-slate-500 dark:text-slate-400 space-y-3">
                 <div class="text-4xl">🔍</div>
-                <h4 class="font-bold text-slate-800 text-sm">Eşleşen İlan Bulunamadı</h4>
-                <p class="text-xs text-slate-400">Arama kriterlerinizi değiştirerek veya "Şimdi Tara" butonuna basarak yeniden deneyin.</p>
+                <h4 class="font-bold text-slate-800 dark:text-slate-200 text-sm">Eşleşen İlan Bulunamadı</h4>
+                <p class="text-xs text-slate-400 dark:text-slate-500">Arama kriterlerinizi değiştirerek veya "Şimdi Tara" butonuna basarak yeniden deneyin.</p>
             </div>
         `;
         return;
@@ -156,17 +184,17 @@ function renderAnnouncements(items) {
         // Puan Rozetleri
         const scoreBadges = (item.matched_score_types || []).map(score => {
             if (score === 'P3') {
-                return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">🎓 KPSS P3 Lisans</span>`;
+                return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">🎓 KPSS P3 Lisans</span>`;
             } else if (score === 'P1' || score === 'P2') {
-                return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">🎯 KPSS ${score} Kariyer</span>`;
+                return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">🎯 KPSS ${score} Kariyer</span>`;
             } else {
-                return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">Genel Kadro</span>`;
+                return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">Genel Kadro</span>`;
             }
         }).join(' ');
 
         // Tarih Bilgisi
         const deadlineBadge = item.deadline_date ? `
-            <div class="flex items-center text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+            <div class="flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg">
                 <span class="mr-1.5">📅</span>
                 <span>Son Başvuru: ${item.deadline_date}</span>
             </div>
@@ -174,25 +202,25 @@ function renderAnnouncements(items) {
 
         // Şehir Bilgisi
         const cityBadge = item.city ? `
-            <span class="inline-flex items-center text-xs text-slate-500 font-medium">
+            <span class="inline-flex items-center text-xs text-slate-500 dark:text-slate-400 font-medium">
                 <span class="mr-1">📍</span> ${item.city}
             </span>
         ` : '';
 
         // PDF Linki
         const pdfButton = (item.pdf_url && item.pdf_url !== item.url) ? `
-            <a href="${item.pdf_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+            <a href="${item.pdf_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors">
                 <span class="mr-1">📄</span> PDF İlan
             </a>
         ` : '';
 
         return `
-            <article class="announcement-card bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm ${stripeClass}">
+            <article class="announcement-card bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm ${stripeClass}">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div class="space-y-2 flex-1">
                         <!-- Portal & Rozetler -->
                         <div class="flex flex-wrap items-center gap-2">
-                            <span class="inline-flex items-center text-xs font-semibold text-slate-500">
+                            <span class="inline-flex items-center text-xs font-semibold text-slate-500 dark:text-slate-400">
                                 <span class="mr-1 text-sm">${item.source_icon}</span> ${item.source_name}
                             </span>
                             ${scoreBadges}
@@ -201,17 +229,17 @@ function renderAnnouncements(items) {
 
                         <!-- Kurum & Başlık -->
                         <div>
-                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">
                                 ${item.institution}
                             </h3>
-                            <h2 class="text-sm sm:text-base font-bold text-slate-900 leading-snug">
+                            <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug">
                                 ${item.title}
                             </h2>
                         </div>
                     </div>
 
                     <!-- Sağ Taraf: Tarih ve Butonlar -->
-                    <div class="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+                    <div class="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800">
                         ${deadlineBadge}
                         <div class="flex items-center space-x-2">
                             ${pdfButton}
@@ -255,18 +283,18 @@ async function fetchScraperStatuses() {
         el.portalStatusGrid.innerHTML = statuses.map(s => {
             const isSuccess = s.status === 'success';
             const isError = s.status === 'error';
-            const statusDot = isSuccess ? 'bg-emerald-500' : (isError ? 'bg-rose-500' : 'bg-slate-300');
+            const statusDot = isSuccess ? 'bg-emerald-500' : (isError ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-600');
             const statusText = isSuccess ? `${s.found_count} İlan` : (isError ? 'Hata' : 'Beklemede');
 
             return `
-                <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-center space-y-1">
+                <div class="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 rounded-xl text-center space-y-1 transition-colors">
                     <div class="text-xl mb-1">${s.portal_icon || '🌐'}</div>
-                    <div class="text-xs font-bold text-slate-800 truncate" title="${s.portal_name}">${s.portal_name}</div>
-                    <div class="inline-flex items-center text-[10px] font-semibold text-slate-600">
+                    <div class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate" title="${s.portal_name}">${s.portal_name}</div>
+                    <div class="inline-flex items-center text-[10px] font-semibold text-slate-600 dark:text-slate-400">
                         <span class="w-1.5 h-1.5 rounded-full ${statusDot} mr-1.5"></span>
                         ${statusText}
                     </div>
-                    ${s.duration_ms > 0 ? `<div class="text-[10px] text-slate-400 font-mono">${Math.round(s.duration_ms)} ms</div>` : ''}
+                    ${s.duration_ms > 0 ? `<div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono">${Math.round(s.duration_ms)} ms</div>` : ''}
                 </div>
             `;
         }).join('');
@@ -318,10 +346,10 @@ async function loadSettings() {
         el.inputChatId.value = data.telegram_chat_id || 'Tanımlanmamış';
         
         if (data.telegram_configured) {
-            el.tgStatusBadge.className = 'flex items-center text-xs font-semibold px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200';
+            el.tgStatusBadge.className = 'flex items-center text-xs font-semibold px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
             el.tgStatusBadge.innerHTML = '<span>✅ Bot Token ve Chat ID Tanımlı</span>';
         } else {
-            el.tgStatusBadge.className = 'flex items-center text-xs font-semibold px-3 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200';
+            el.tgStatusBadge.className = 'flex items-center text-xs font-semibold px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800';
             el.tgStatusBadge.innerHTML = '<span>⚠️ Yapılandırılmadı (.env dosyasını doldurun)</span>';
         }
     } catch (err) {
@@ -340,16 +368,16 @@ async function testTelegram() {
         const data = await res.json();
 
         if (data.success) {
-            el.telegramTestFeedback.className = 'text-xs text-center mt-2 text-emerald-600 font-semibold';
+            el.telegramTestFeedback.className = 'text-xs text-center mt-2 text-emerald-600 dark:text-emerald-400 font-semibold';
             el.telegramTestFeedback.textContent = '✅ ' + data.message;
             showToast('Telegram bildirimi telefonunuza gönderildi!', 'success');
         } else {
-            el.telegramTestFeedback.className = 'text-xs text-center mt-2 text-rose-600 font-semibold';
+            el.telegramTestFeedback.className = 'text-xs text-center mt-2 text-rose-600 dark:text-rose-400 font-semibold';
             el.telegramTestFeedback.textContent = '❌ ' + data.message;
             showToast(data.message, 'error');
         }
     } catch (err) {
-        el.telegramTestFeedback.className = 'text-xs text-center mt-2 text-rose-600 font-semibold';
+        el.telegramTestFeedback.className = 'text-xs text-center mt-2 text-rose-600 dark:text-rose-400 font-semibold';
         el.telegramTestFeedback.textContent = 'Hata: ' + err.message;
     } finally {
         el.btnTestTelegram.disabled = false;
@@ -358,6 +386,9 @@ async function testTelegram() {
 
 // Olay Dinleyicileri (Event Listeners)
 function setupEventListeners() {
+    // Tema Değiştirici
+    el.btnThemeToggle.addEventListener('click', toggleTheme);
+
     // Canlı Arama Debounce
     let searchTimeout;
     el.searchInput.addEventListener('input', (e) => {
@@ -380,11 +411,11 @@ function setupEventListeners() {
     el.scoreFilterGroup.querySelectorAll('.score-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             el.scoreFilterGroup.querySelectorAll('.score-btn').forEach(b => {
-                b.classList.remove('bg-slate-900', 'text-white');
-                b.classList.add('text-slate-700');
+                b.classList.remove('bg-slate-900', 'dark:bg-white', 'text-white', 'dark:text-slate-900');
+                b.classList.add('text-slate-700', 'dark:text-slate-300');
             });
-            btn.classList.add('bg-slate-900', 'text-white');
-            btn.classList.remove('text-slate-700');
+            btn.classList.add('bg-slate-900', 'dark:bg-white', 'text-white', 'dark:text-slate-900');
+            btn.classList.remove('text-slate-700', 'dark:text-slate-300');
 
             state.scoreFilter = btn.dataset.score;
             state.offset = 0;
@@ -447,6 +478,7 @@ function setupEventListeners() {
 
 // Uygulamayı Başlat
 document.addEventListener('DOMContentLoaded', () => {
+    applyTheme(state.theme);
     setupEventListeners();
     fetchStats();
     fetchScraperStatuses();

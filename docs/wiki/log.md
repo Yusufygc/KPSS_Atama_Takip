@@ -4,6 +4,12 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-10] BUGFIX & FEATURE | Türkçe Karakter Kodlaması Düzeltildi ve Tema Değişimi Eklendi
+* Kamu İlan (SBB) adaptöründe `windows-1254` kaynaklı Türkçe karakter bozulması (`GELÄ°R Ä°DARESÄ°...`) UTF-8 kod çözümüyle giderildi.
+* Veritabanındaki eski bozuk SBB kayıtları temizlenerek 131 adet ilan eksiksiz Türkçe karakterlerle yeniden işlendi.
+* Web Dashboard'a Aydınlık / Karanlık Mod (Dark / Light Mode) eklendi; kullanıcı tercihi `localStorage` ile kalıcı hale getirildi.
+* Bağlantılar: [[scrapers]], [[architecture]], [[rules]]
+
 ## [2026-10-10] WEB DASHBOARD COMPLETE | Modern Web Arayüzü ve FastAPI Entegrasyonu Tamamlandı
 * `web/index.html`, `web/css/style.css` ve `web/js/app.js` modüler istemci yapısıyla kodlandı.
 * UI-Backend mutlak ayrımı sağlandı; arayüz yalnızca `/api/...` REST uç noktalarını tüketiyor.

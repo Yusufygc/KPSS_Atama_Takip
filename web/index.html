@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
@@ -19,16 +20,6 @@
                             700: '#075985',
                             800: '#0c4a6e',
                             900: '#082f49',
-                        },
-                        p3: {
-                            badge: '#e0e7ff',
-                            text: '#3730a3',
-                            border: '#818cf8',
-                        },
-                        career: {
-                            badge: '#ffedd5',
-                            text: '#9a3412',
-                            border: '#fb923c',
                         }
                     }
                 }
@@ -40,34 +31,39 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-['Inter']">
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-['Inter'] transition-colors duration-200">
 
     <!-- Üst Başlık (Header) -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+    <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-sm transition-colors duration-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white text-xl shadow-md">
                     🏛
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold text-slate-900 leading-tight">KPSS Atama & İlan Takip</h1>
-                    <p class="text-xs text-slate-500 font-medium">6 Resmi Kamu Portalı Eşzamanlı Takip</p>
+                    <h1 class="text-lg font-bold text-slate-900 dark:text-white leading-tight">KPSS Atama & İlan Takip</h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">6 Resmi Kamu Portalı Eşzamanlı Takip</p>
                 </div>
             </div>
 
             <!-- Aksiyon Butonları -->
-            <div class="flex items-center space-x-3">
-                <div class="hidden sm:flex items-center bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-3 py-1.5 rounded-full font-medium">
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <div class="hidden sm:flex items-center bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs px-3 py-1.5 rounded-full font-medium">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-2"></span>
                     Otomatik Tarama Aktif (15 Dk)
                 </div>
 
-                <button id="btnSettingsModal" class="flex items-center space-x-1.5 px-3.5 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                <!-- Tema Değiştirme Butonu (Light/Dark Toggle) -->
+                <button id="btnThemeToggle" title="Temayı Değiştir (Aydınlık / Karanlık)" class="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                    <span id="themeIcon" class="text-base">🌙</span>
+                </button>
+
+                <button id="btnSettingsModal" class="flex items-center space-x-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors">
                     <span>⚙️</span>
                     <span class="hidden sm:inline">Telegram & Ayarlar</span>
                 </button>
 
-                <button id="btnTriggerScrape" class="flex items-center space-x-2 px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-all shadow-brand-500/20 active:scale-95">
+                <button id="btnTriggerScrape" class="flex items-center space-x-2 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-sm transition-all shadow-brand-500/20 active:scale-95">
                     <span id="scrapeBtnIcon" class="inline-block transition-transform">🚀</span>
                     <span id="scrapeBtnText">Şimdi Tara</span>
                 </button>
@@ -81,56 +77,56 @@
         <!-- 1. İstatistik Kartları -->
         <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- P3 Öncelikli Kart -->
-            <div id="statCardP3" class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                <div class="flex items-center justify-between text-indigo-700 mb-2">
+            <div id="statCardP3" class="bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/40 dark:to-slate-900 border border-indigo-200/80 dark:border-indigo-900/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group">
+                <div class="flex items-center justify-between text-indigo-700 dark:text-indigo-400 mb-2">
                     <span class="text-xs font-bold uppercase tracking-wider">🎓 P3 Öncelikli Kadrolar</span>
-                    <span class="text-xl">⭐️</span>
+                    <span class="text-xl group-hover:scale-110 transition-transform">⭐️</span>
                 </div>
                 <div class="flex items-baseline space-x-2">
-                    <span id="statP3Count" class="text-3xl font-extrabold text-indigo-900">-</span>
-                    <span class="text-xs text-indigo-600 font-medium">Lisans Genel</span>
+                    <span id="statP3Count" class="text-3xl font-extrabold text-indigo-900 dark:text-indigo-200">-</span>
+                    <span class="text-xs text-indigo-600 dark:text-indigo-400 font-medium">Lisans Genel</span>
                 </div>
             </div>
 
             <!-- P1 & P2 Kariyer Kartı -->
-            <div id="statCardCareer" class="bg-gradient-to-br from-amber-50 to-white border border-amber-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                <div class="flex items-center justify-between text-amber-700 mb-2">
+            <div id="statCardCareer" class="bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/40 dark:to-slate-900 border border-amber-200/80 dark:border-amber-900/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group">
+                <div class="flex items-center justify-between text-amber-700 dark:text-amber-400 mb-2">
                     <span class="text-xs font-bold uppercase tracking-wider">🎯 P1 / P2 Kariyer</span>
-                    <span class="text-xl">🏛</span>
+                    <span class="text-xl group-hover:scale-110 transition-transform">🏛</span>
                 </div>
                 <div class="flex items-baseline space-x-2">
-                    <span id="statCareerCount" class="text-3xl font-extrabold text-amber-900">-</span>
-                    <span class="text-xs text-amber-600 font-medium">Uzman / Müfettiş</span>
+                    <span id="statCareerCount" class="text-3xl font-extrabold text-amber-900 dark:text-amber-200">-</span>
+                    <span class="text-xs text-amber-600 dark:text-amber-400 font-medium">Uzman / Müfettiş</span>
                 </div>
             </div>
 
             <!-- Toplam Aktif İlan -->
-            <div id="statCardTotal" class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                <div class="flex items-center justify-between text-slate-500 mb-2">
+            <div id="statCardTotal" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group">
+                <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
                     <span class="text-xs font-bold uppercase tracking-wider">📋 Toplam Kayıtlı İlan</span>
-                    <span class="text-xl">💼</span>
+                    <span class="text-xl group-hover:scale-110 transition-transform">💼</span>
                 </div>
                 <div class="flex items-baseline space-x-2">
-                    <span id="statTotalCount" class="text-3xl font-extrabold text-slate-900">-</span>
-                    <span class="text-xs text-slate-500 font-medium">6 Portal</span>
+                    <span id="statTotalCount" class="text-3xl font-extrabold text-slate-900 dark:text-white">-</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">6 Portal</span>
                 </div>
             </div>
 
             <!-- Bildirilmeyen / Yeni İlanlar -->
-            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                <div class="flex items-center justify-between text-slate-500 mb-2">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+                <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 mb-2">
                     <span class="text-xs font-bold uppercase tracking-wider">🔔 Bildirim Bekleyen</span>
                     <span class="text-xl">📬</span>
                 </div>
                 <div class="flex items-baseline space-x-2">
-                    <span id="statUnnotifiedCount" class="text-3xl font-extrabold text-slate-900">-</span>
-                    <span class="text-xs text-slate-500 font-medium">Yeni İlan</span>
+                    <span id="statUnnotifiedCount" class="text-3xl font-extrabold text-slate-900 dark:text-white">-</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Yeni İlan</span>
                 </div>
             </div>
         </section>
 
         <!-- 2. Filtre ve Arama Alanı -->
-        <section class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+        <section class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-4 transition-colors">
             <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
                 <!-- Arama Kutusu -->
                 <div class="relative flex-1">
@@ -141,13 +137,13 @@
                         type="text" 
                         id="searchInput" 
                         placeholder="Kurum adı, pozisyon, unvan veya şehir ara..." 
-                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all"
+                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white dark:focus:bg-slate-800 transition-all"
                     >
                 </div>
 
                 <!-- Portal Seçim Dropdown -->
                 <div class="w-full md:w-64">
-                    <select id="portalFilter" class="w-full py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-slate-700">
+                    <select id="portalFilter" class="w-full py-2.5 px-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-slate-700 dark:text-slate-200">
                         <option value="">🌐 Tüm Kaynak Portallar</option>
                         <option value="kariyer_kapisi">💼 Kariyer Kapısı (CBİKO)</option>
                         <option value="resmi_gazete">📜 T.C. Resmî Gazete</option>
@@ -160,21 +156,21 @@
             </div>
 
             <!-- Hızlı Puan Türü Filtre Butonları -->
-            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <div class="flex flex-wrap items-center gap-1.5" id="scoreFilterGroup">
-                    <span class="text-xs font-semibold text-slate-400 mr-1">KPSS Puanı:</span>
-                    <button data-score="" class="score-btn active px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 text-white transition-colors">
+                    <span class="text-xs font-semibold text-slate-400 dark:text-slate-500 mr-1">KPSS Puanı:</span>
+                    <button data-score="" class="score-btn active px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 transition-colors">
                         Tümü
                     </button>
-                    <button data-score="P3" class="score-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors">
+                    <button data-score="P3" class="score-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 transition-colors">
                         🎓 Sadece P3 (Lisans)
                     </button>
-                    <button data-score="CAREER" class="score-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors">
+                    <button data-score="CAREER" class="score-btn px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-200 dark:border-amber-800 transition-colors">
                         🎯 P1 & P2 (Kariyer Meslekleri)
                     </button>
                 </div>
 
-                <div class="text-xs text-slate-500 font-medium">
+                <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">
                     <span id="resultCountText">Yükleniyor...</span>
                 </div>
             </div>
@@ -182,30 +178,29 @@
 
         <!-- 3. İlan Listesi Konteyneri -->
         <section id="announcementsContainer" class="space-y-3">
-            <!-- Yükleme İskeleti (Skeleton) -->
-            <div class="bg-white border border-slate-200 rounded-2xl p-6 text-center text-slate-400 animate-pulse">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center text-slate-400 dark:text-slate-500 animate-pulse">
                 İlanlar taranıyor ve yükleniyor...
             </div>
         </section>
 
         <!-- 4. Sayfalama Kontrolleri -->
         <div id="paginationContainer" class="flex items-center justify-center space-x-3 py-4 hidden">
-            <button id="btnPrevPage" class="px-4 py-2 text-sm font-medium bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+            <button id="btnPrevPage" class="px-4 py-2 text-sm font-medium bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors">
                 &larr; Önceki
             </button>
-            <span id="pageInfoText" class="text-sm font-semibold text-slate-600">Sayfa 1</span>
-            <button id="btnNextPage" class="px-4 py-2 text-sm font-medium bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+            <span id="pageInfoText" class="text-sm font-semibold text-slate-600 dark:text-slate-300">Sayfa 1</span>
+            <button id="btnNextPage" class="px-4 py-2 text-sm font-medium bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors">
                 Sonraki &rarr;
             </button>
         </div>
 
         <!-- 5. Portallar Sağlık & Durum Paneli -->
-        <section class="mt-12 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+        <section class="mt-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm transition-colors">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center">
+                <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center">
                     <span class="mr-2">📡</span> Kamu Portalları Tarama Durumu
                 </h3>
-                <span class="text-xs text-slate-400">6 Portal Entegre</span>
+                <span class="text-xs text-slate-400 dark:text-slate-500">6 Portal Entegre</span>
             </div>
             <div id="portalStatusGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <!-- Dinamik portallar javascript ile doldurulacak -->
@@ -214,30 +209,30 @@
     </main>
 
     <!-- Telegram & Ayarlar Modalı -->
-    <div id="settingsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-scale-in">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 class="text-lg font-bold text-slate-900 flex items-center">
+    <div id="settingsModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-5 animate-scale-in transition-colors">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center">
                     <span class="mr-2">⚙️</span> Telegram & Sistem Ayarları
                 </h3>
-                <button id="btnCloseSettingsModal" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                <button id="btnCloseSettingsModal" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl font-bold">&times;</button>
             </div>
 
             <div class="space-y-4 text-sm">
-                <div class="p-3 bg-brand-50 border border-brand-100 rounded-xl text-brand-900 text-xs leading-relaxed">
+                <div class="p-3 bg-brand-50 dark:bg-brand-950/40 border border-brand-100 dark:border-brand-900/50 rounded-xl text-brand-900 dark:text-brand-200 text-xs leading-relaxed">
                     💡 <b>Nasıl Kullanılır?</b> Telegram'da <code>@BotFather</code> ile bot oluşturup token alın ve Chat ID'nizi <code>.env</code> dosyasına kaydedin. Yeni bir ilan keşfedildiğinde bot telefonunuza anında bildirim atar.
                 </div>
 
                 <div class="space-y-2">
-                    <label class="block font-semibold text-slate-700 text-xs uppercase">Telegram Bildirim Durumu</label>
-                    <div id="tgStatusBadge" class="flex items-center text-xs font-semibold px-3 py-2 rounded-lg bg-slate-100 text-slate-600">
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300 text-xs uppercase">Telegram Bildirim Durumu</label>
+                    <div id="tgStatusBadge" class="flex items-center text-xs font-semibold px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                         Kontrol ediliyor...
                     </div>
                 </div>
 
                 <div class="space-y-2">
-                    <label class="block font-semibold text-slate-700 text-xs uppercase">Yapılandırılmış Chat ID</label>
-                    <input type="text" id="inputChatId" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-600 text-xs font-mono">
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300 text-xs uppercase">Yapılandırılmış Chat ID</label>
+                    <input type="text" id="inputChatId" readonly class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 text-xs font-mono">
                 </div>
 
                 <div class="pt-2">
@@ -249,8 +244,8 @@
                 </div>
             </div>
 
-            <div class="pt-2 border-t border-slate-100 flex justify-end">
-                <button id="btnDismissModal" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold">
+            <div class="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                <button id="btnDismissModal" class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors">
                     Kapat
                 </button>
             </div>
@@ -261,7 +256,7 @@
     <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 py-4 mt-8 text-center text-xs text-slate-400">
+    <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-4 mt-8 text-center text-xs text-slate-400 dark:text-slate-500 transition-colors">
         <p>KPSS Atama & Personel Alım Takip Sistemi &bull; Lisans P3, P1 ve P2 Kadro Takibi</p>
     </footer>
 

@@ -22,7 +22,7 @@ class KamuIlanSbbScraper(BaseScraper):
     async def scrape(self) -> List[AnnouncementCreate]:
         self.logger.info("Kamu İlan (SBB) taranıyor...")
         response = await self._request("GET", self.MENU_URL)
-        html = response.content.decode("windows-1254", errors="ignore")
+        html = response.content.decode("utf-8", errors="replace")
         soup = BeautifulSoup(html, "html.parser")
 
         announcements: List[AnnouncementCreate] = []
