@@ -1,0 +1,57 @@
+# Proje ve Geliştirme Kuralları (Rules)
+
+Bu doküman, projenin tüm yaşam döngüsünde uyulması zorunlu olan mimari ve kodlama standartlarını tanımlar.
+
+## 1. Temel Yazılım Prensipleri
+
+* **SOLID:**
+  * **S (Single Responsibility):** Her sınıf ve her dosya tek bir sorumluluğa sahiptir. God Object veya çok amaçlı "utils.py" çöplükleri kesinlikle yasaktır.
+  * **O (Open/Closed):** Sistem yeni sitelere ve yeni bildirim kanallarına açık, mevcut çekirdek koda dokunmadan genişletilebilir olmalıdır (Adapter & Registry deseni).
+  * **L (Liskov Substitution):** Tüm scraper adaptörleri `BaseScraper` soyut sınıfını eksiksiz uygular ve birbirinin yerine geçebilir.
+  * **I (Interface Segregation):** Arayüzler küçük, odaklı ve amaca uygun tutulur.
+  * **D (Dependency Inversion):** Üst seviye servisler doğrudan veritabanı veya network kütüphanelerine değil, soyut arayüzlere (Repository & Scraper Interface) bağımlıdır.
+* **KISS (Keep It Simple, Stupid):** Gereksiz aşırı mühendislikten (overengineering) kaçınılır. Her çözüm olabilecek en anlaşılır ve doğrudan yolla kurgulanır.
+* **DRY (Don't Repeat Yourself):** Kod ve mantık tekrarı yapılmaz; ortak yapılar soyutlamalar ve yardımcı servislerle paylaşılır.
+
+## 2. Hardcode ve Magic Number Yasağı
+
+* **Asla Satır Arasında Sabit Yazma:** Metinler, URL kalıpları, sayfa boyutları, zaman aşımı süreleri kod içine gömülmez.
+* **Merkezi String Mekanizması:** Tüm kullanıcıya dönen metinler, log şablonları ve hata mesajları `core/constants/strings.py` dosyasında tutulur.
+* **Merkezi İkon Mekanizması:** Tüm emoji, UI ikonları ve durum simgeleri `core/constants/icons.py` dosyasında tutulur.
+* **Merkezi Sayısal ve Yapılandırma Sabitleri:** Zaman aşımı (timeout), yeniden deneme (retry) sayıları, tarama periyotları `core/constants/settings.py` ve `.env` üzerinden yönetilir.
+
+## 3. UI - Backend Mutlak Ayrımı (Zero Leakage)
+
+* **Katman İzolasyonu:** UI (Frontend) sadece ve sadece REST API (veya SSE/WebSocket) üzerinden JSON DTO (Data Transfer Object) tüketir.
+* **İş Mantığı Sızmaz:** Filtreleme mantığı, puan türü eşleştirmesi, mükerrer kontrolü ve kazıma detayları tamamen backend servis katmanında çalışır.
+* **Frontend Bağımsızlığı:** Backend kapatılıp açılabilir, CLI veya Telegram üzerinden bağımsız çalıştırılabilir; UI bir sunum katmanından ibarettir.
+
+## 4. Tasarım Desenleri (Design Patterns)
+
+* **Adapter Pattern:** 6 farklı sitenin farklı yanıt formatları (JSON, HTML, PDF linki, ASP.NET WebForms) standart `Announcement` modeline dönüştürülür.
+* **Factory / Registry Pattern:** `ScraperRegistry` dinamik olarak kayıtlı kazıyıcıları keşfeder ve başlatır.
+* **Repository Pattern:** `AnnouncementRepository` ve `FilterRepository` veritabanı işlemlerini iş mantığından tamamen soyutlar.
+* **Observer / Event-Driven Pattern:** Yeni ilan keşfedildiğinde olay tetiklenir (`AnnouncementDiscoveredEvent`), dinleyiciler (TelegramNotifier, DatabaseLogger) haberdar edilir.
+* **Strategy Pattern:** İlanın başlık ve açıklamasındaki KPSS puanı (P3, P1, P2) ile aday profili strateji sınıfları üzerinden puanlanır ve filtrelenir.
+
+## 5. Hata Yönetimi (Exception Handling) ve İyileşme
+
+* Özel hiyerarşik istisna sınıfları (`KPSSBaseException` temelinde):
+  * `ScraperException` -> `NetworkScraperException`, `ParsingScraperException`, `RateLimitScraperException`
+  * `NotificationException` -> `TelegramDeliveryException`
+  * `DatabaseException` -> `RecordDuplicateException`, `QueryExecutionException`
+  * `ValidationException`
+* Bir sitenin kazıma sırasında çökmesi diğer sitelerin veya ana servisin çalışmasını asla durduramaz (Graceful Degradation / Fault Tolerance).
+* Geçici ağ hatalarında katlanarak artan bekleme (Exponential Backoff Retry) uygulanır.
+
+## 6. Loglama Mekanizması
+
+* Çok kanallı loglama: Konsol (renkli/okunaklı) + Dönen Dosya (Rotating File Logger, `logs/app.log`).
+* Loglarda hassas bilgi (Telegram token, kimlik bilgileri) maskelenir.
+* Bağlamsal loglama: Her log mesajı hangi scraper veya işlem tarafından üretildiğini belirtir `[KariyerKapisiScraper] 24 yeni ilan bulundu`.
+
+## 7. Asenkron ve Paralel Çalışma
+
+* Asenkron I/O (`asyncio`, `httpx`, `aiosqlite`) ile eşzamanlı çalışma.
+* 6 site aynı anda taranırken UI veya API yanıt vermeyi asla kesmez.
+* Arka plan zamanlayıcısı (Scheduler) API thread'ini bloke etmez.
