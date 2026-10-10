@@ -33,32 +33,34 @@ class KamuIlanSbbScraper(BaseScraper):
             if "ilandetay.aspx" not in href.lower():
                 continue
 
-            raw_title = " ".join(a.get_text(strip=True).split())
-            if not raw_title or len(raw_title) < 5:
-                continue
+            black_span = a.find("span", class_="black")
+            patrol_span = a.find("span", class_="patrol")
+            date_span = a.find("span", class_="h5date")
 
+            institution = black_span.get_text(strip=True) if black_span else ""
+            position = patrol_span.get_text(strip=True) if patrol_span else ""
+            deadline_str = date_span.get_text(strip=True) if date_span else ""
+
+            if not institution and not position:
+                raw_text = " ".join(a.get_text(separator=" ", strip=True).split())
+                if not raw_text or len(raw_text) < 5:
+                    continue
+                institution = self.portal_name
+                position = raw_text
+
+            title = f"{institution} - {position}" if institution and position else (position or institution)
             full_url = f"{self.BASE_URL}/{href.lstrip('/')}" if not href.startswith("http") else href
-
-            # Tarih parantezini ayrıştırma (Örn: "ANKARA ÜNİVERSİTESİ 19 MEMUR ALACAK ( 28 Eylül - 13 Ekim)")
-            deadline_match = re.search(r"\(\s*([^)]+)\s*\)$", raw_title)
-            deadline_str = deadline_match.group(1) if deadline_match else None
-
-            # Kurum adı tahmini
-            institution = raw_title
-            for kw in ["ALACAK", "ALIMI", "TEMİN", "MEMUR", "PERSONEL"]:
-                if kw in raw_title:
-                    institution = raw_title.split(kw)[0].strip()
-                    break
 
             announcements.append(
                 AnnouncementCreate(
                     source_key=self.portal_key,
                     source_name=self.portal_name,
-                    title=raw_title,
+                    title=title,
                     institution=institution or self.portal_name,
+                    position=position or None,
                     url=full_url,
-                    deadline_date=deadline_str,
-                    raw_content=f"{raw_title} (Detay: {full_url})",
+                    deadline_date=deadline_str or None,
+                    raw_content=f"{title} (Son Başvuru: {deadline_str})",
                 )
             )
 

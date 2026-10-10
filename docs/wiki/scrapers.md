@@ -22,9 +22,10 @@ Bu doküman, sistemin veri topladığı 6 resmi kamu kaynağının teknik bağla
 ### 3. Kamu İlan SBB (`KamuIlanSbbScraper`)
 * **Kaynak:** T.C. Cumhurbaşkanlığı Strateji ve Bütçe Başkanlığı
 * **Adres:** `https://kamuilan.sbb.gov.tr/ilan_menu.aspx`
-* **Protokol:** HTTP GET + BeautifulSoup
-* **Karakter Kodlaması:** `windows-1254` / `iso-8859-9`
-* **Veri:** Kurum adı, alım adedi ve unvanı, başvuru tarih aralığı, `ilanDetay.aspx?kod=...` bağlantısı.
+* **Protokol:** HTTP GET + BeautifulSoup (`span.black`, `span.patrol`, `span.h5date` etiketleri)
+* **Karakter Kodlaması:** `utf-8` (Response `decode("utf-8", errors="replace")`)
+* **Hotlink Koruması & Detay Sayfası:** `ilanDetay.aspx?kod=...` sayfası bir HTML sayfası değil, doğrudan ilgili ilanın resmi başvuru kılavuzu PDF belgesidir (`application/pdf`). Microsoft IIS sunucusu `Referer` başlığı doğrulaması yapar; `Referer: https://kamuilan.sbb.gov.tr/` başlığı bulunmayan harici yönlendirmelere 404 (Aradığınız sayfa bulunamadı) yanıtı döner.
+* **Çözüm:** Sistemimiz `GET /api/announcements/{id}/document` asenkron proxy uç noktası üzerinden `Referer: https://kamuilan.sbb.gov.tr/` ile PDF belgesini indirip yerel `data/documents/` dizinine önbelleğe alır ve tarayıcıya kesintisiz akıtır. İstemciye doğrudan PDF görüntüleme ve SBB portalı ana sayfa linki sunulur.
 
 ### 4. Yerel Yönetimler GM (`YerelYonetimlerScraper`)
 * **Kaynak:** Çevre, Şehircilik ve İklim Değişikliği Bakanlığı Yerel Yönetimler Genel Müdürlüğü

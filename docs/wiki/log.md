@@ -4,6 +4,15 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-10] BUGFIX | Kamu İlan (SBB) 404 Hotlink Koruması Çözüldü ve PDF Proxy Entegre Edildi
+* SBB sunucusunun (`kamuilan.sbb.gov.tr/ilanDetay.aspx`) doğrudan harici tarayıcı yönlendirmelerinde HTTP `Referer` başlığı doğrulaması yaptığı ve referer eksik/harici olduğunda 404 döndürdüğü tespit edildi.
+* İlan detay sayfasının aslında doğrudan resmi işe alım PDF belgesi akıttığı (`application/pdf`) keşfedildi.
+* FastAPI'ye `GET /api/announcements/{id}/document` asenkron proxy ve önbellek uç noktası eklendi; `Referer: https://kamuilan.sbb.gov.tr/` başlığıyla PDF çekilerek yerel önbelleğe (`data/documents/`) kaydedildi ve tarayıcıya kesintisiz akıtıldı.
+* Web Dashboard'da SBB ilanları için "📄 İlan Metni (PDF)" doğrudan proxy uç noktasına bağlandı, yanına "🏛️ SBB Portalı" ana sayfa butonu eklendi.
+* SBB kazıyıcı adaptörü `span.black`, `span.patrol` ve `span.h5date` etiketlerini ayrıştıracak şekilde optimize edildi; kurum, pozisyon ve son başvuru tarihleri tam ayrıştırıldı.
+* Veritabanı 131 adet temiz, hatasız ve tıklandığında anında PDF açılan ilan kaydıyla güncellendi.
+* Bağlantılar: [[scrapers]], [[architecture]], [[rules]]
+
 ## [2026-10-10] BUGFIX & FEATURE | Türkçe Karakter Kodlaması Düzeltildi ve Tema Değişimi Eklendi
 * Kamu İlan (SBB) adaptöründe `windows-1254` kaynaklı Türkçe karakter bozulması (`GELÄ°R Ä°DARESÄ°...`) UTF-8 kod çözümüyle giderildi.
 * Veritabanındaki eski bozuk SBB kayıtları temizlenerek 131 adet ilan eksiksiz Türkçe karakterlerle yeniden işlendi.

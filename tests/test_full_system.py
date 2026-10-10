@@ -92,6 +92,13 @@ async def run_full_system_tests():
         assert "total" in ann_data
         print(f"   [OK] GET /api/announcements: {len(ann_data['items'])} items returned.")
 
+        # Test Document Proxy / View Endpoint
+        first_item = ann_data['items'][0]
+        first_id = first_item['id']
+        doc_resp = await client.get(f"/api/announcements/{first_id}/document", follow_redirects=False)
+        assert doc_resp.status_code in (200, 307)
+        print(f"   [OK] GET /api/announcements/{first_id}/document returned {doc_resp.status_code}")
+
         # Test Static Web Dashboard
         web_resp = await client.get("/")
         assert web_resp.status_code == 200

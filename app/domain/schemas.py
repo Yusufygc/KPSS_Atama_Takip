@@ -37,6 +37,7 @@ class AnnouncementResponse(BaseModel):
     city: Optional[str] = None
     url: str
     pdf_url: Optional[str] = None
+    document_url: Optional[str] = None
     publish_date: Optional[str] = None
     deadline_date: Optional[str] = None
     matched_score_types: List[ScoreType] = []
@@ -59,6 +60,11 @@ class AnnouncementResponse(BaseModel):
         else:
             p_icon = ScoreIcons.GENERAL
 
+        doc_url = f"/api/announcements/{entity.id}/document" if entity.id else None
+        pdf_url = entity.pdf_url
+        if entity.source_key == "kamu_ilan_sbb":
+            pdf_url = pdf_url or doc_url
+
         return cls(
             id=entity.id or 0,
             hash_id=entity.hash_id,
@@ -70,7 +76,8 @@ class AnnouncementResponse(BaseModel):
             position=entity.position,
             city=entity.city,
             url=entity.url,
-            pdf_url=entity.pdf_url,
+            pdf_url=pdf_url,
+            document_url=doc_url,
             publish_date=entity.publish_date,
             deadline_date=entity.deadline_date,
             matched_score_types=entity.matched_score_types,

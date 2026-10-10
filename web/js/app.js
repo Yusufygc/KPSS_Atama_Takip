@@ -207,12 +207,28 @@ function renderAnnouncements(items) {
             </span>
         ` : '';
 
-        // PDF Linki
-        const pdfButton = (item.pdf_url && item.pdf_url !== item.url) ? `
-            <a href="${item.pdf_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors">
-                <span class="mr-1">📄</span> PDF İlan
-            </a>
-        ` : '';
+        // Aksiyon Butonları
+        let actionButtons = '';
+        if (item.source_key === 'kamu_ilan_sbb') {
+            const docUrl = item.document_url || `/api/announcements/${item.id}/document`;
+            actionButtons = `
+                <a href="https://kamuilan.sbb.gov.tr/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Kamu İlan Ana Sayfası">
+                    <span>🏛️ SBB Portalı</span>
+                </a>
+                <a href="${docUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-all active:scale-95" title="Resmi İlan Metnini (PDF) Aç">
+                    <span>📄 İlan Metni (PDF)</span>
+                    <span class="ml-1 text-xs">&rarr;</span>
+                </a>
+            `;
+        } else {
+            actionButtons = `
+                ${pdfButton}
+                <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-all active:scale-95">
+                    <span>İlana Git</span>
+                    <span class="ml-1 text-xs">&rarr;</span>
+                </a>
+            `;
+        }
 
         return `
             <article class="announcement-card bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm ${stripeClass}">
@@ -242,11 +258,7 @@ function renderAnnouncements(items) {
                     <div class="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800">
                         ${deadlineBadge}
                         <div class="flex items-center space-x-2">
-                            ${pdfButton}
-                            <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-3.5 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-all active:scale-95">
-                                <span>İlana Git</span>
-                                <span class="ml-1 text-xs">&rarr;</span>
-                            </a>
+                            ${actionButtons}
                         </div>
                     </div>
                 </div>

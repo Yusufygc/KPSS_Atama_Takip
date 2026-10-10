@@ -19,9 +19,10 @@ __pycache__/
 *.sqlite3
 *.db
 
-# Logs & temp
+# Logs & temp & data
 *.log
 logs/
+data/
 temp/
 scratch/
 

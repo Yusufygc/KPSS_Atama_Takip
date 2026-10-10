@@ -63,10 +63,13 @@ class TelegramNotifier(BaseNotifier):
             NotificationStrings.SOURCE.format(source=f"{portal_icon} {item.source_name}")
         )
         lines.append("")
-        lines.append(NotificationStrings.LINK.format(url=item.url))
-
-        if item.pdf_url and item.pdf_url != item.url:
-            lines.append(NotificationStrings.PDF_LINK.format(pdf_url=item.pdf_url))
+        if item.source_key == "kamu_ilan_sbb":
+            lines.append("🏛️ <b>Resmi Portal:</b> https://kamuilan.sbb.gov.tr/")
+            lines.append("<i>ℹ️ Not: SBB doğrudan dış bağlantı erişimini engellemektedir. İlan PDF belgesine web dashboard üzerinden veya SBB ana sayfasından erişebilirsiniz.</i>")
+        else:
+            lines.append(NotificationStrings.LINK.format(url=item.url))
+            if item.pdf_url and item.pdf_url != item.url:
+                lines.append(NotificationStrings.PDF_LINK.format(pdf_url=item.pdf_url))
 
         return "\n".join(lines)
 
