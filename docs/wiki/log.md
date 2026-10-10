@@ -4,6 +4,22 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-10] FEATURE | Bilgisayar Mühendisliği ve Bilişim Odaklı Profesyonel Filtreleme Sistemi Entegre Edildi
+* Kullanıcının bölümü olan **Bilgisayar Mühendisliği** ve kamu sektöründeki ilgili uzmanlık kadrolarını (Yazılım, Siber Güvenlik, Sözleşmeli Bilişim Personeli - SBP, Ağ/Sistem, Çözümleyici, Veri/Yapay Zeka) anında tespit eden `ITFieldMatcher` kural ve regex motoru (`app/core/scoring/it_field_matcher.py`) geliştirildi.
+* Kamudaki 375 sayılı KHK Ek 6. madde kapsamındaki Sözleşmeli Bilişim Personeli (SBP), Bilgisayar Mühendisi, Çözümleyici, Programcı ve Siber Güvenlik ilanları normalize edilmiş Türkçe regex modelleriyle 7 alt uzmanlık etiketine (`ITSubField`) ayrıştırıldı.
+* Domain modeli `Announcement` ve REST şemaları `field_tags: List[str]` ve `is_it_field: bool` alanlarıyla zenginleştirildi.
+* SQLite veritabanına `field_tags` ve `is_it_field` sütunları ile `idx_announcements_it` indeksi eklenerek geriye dönük uyumlu dinamik migrasyon uygulandı. Mevcut tüm 241 kayıt etiketlendi ve 14 adet bilişim ilanı anında indekslendi.
+* `AnnouncementRepository` ve `AnnouncementService` katmanlarına `only_it: bool` ve `field_tag: Optional[str]` parametreleri eklendi; `GET /api/announcements/stats` uç noktasına `it_count` metriği dahil edildi.
+* Web Dashboard'a:
+  - 5. KPI Metrik Kartı: "💻 Bilişim & Yazılım - Bilgisayar Müh."
+  - Hızlı tek tık arama butonları (Bilgisayar Mühendisi, Sözleşmeli Bilişim, Yazılım, Siber Güvenlik, Çözümleyici, Sistem)
+  - Hızlı Filtre Barına "💻 Bölümüm (Bilgisayar & Bilişim)" butonu ve rozeti
+  - Bilişim alt uzmanlık branş çipleri (Tümü, SBP, Yazılım & Web, Siber Güvenlik, Bilgisayar Mühendisliği, Ağ & Sistem, Veri & Yapay Zeka)
+  - İlan kartlarında belirgin camgöbeği (cyan) şerit (`priority-it-stripe`) ve alt uzmanlık etiketleri eklendi.
+  - Seçimler `localStorage` üzerinde saklanarak sayfa yenilemelerinde korunur hale getirildi.
+* Uçtan uca sistem test paketi (`tests/test_full_system.py`) yeni Bilişim motorunu ve API filtreleme yeteneklerini kapsayacak şekilde güncellendi ve tüm testler başarıyla geçti.
+* Bağlantılar: [[kpss_scoring]], [[architecture]], [[rules]]
+
 ## [2026-10-10] BUGFIX | Kamu İlan (SBB) 404 Hotlink Koruması Çözüldü ve PDF Proxy Entegre Edildi
 * SBB sunucusunun (`kamuilan.sbb.gov.tr/ilanDetay.aspx`) doğrudan harici tarayıcı yönlendirmelerinde HTTP `Referer` başlığı doğrulaması yaptığı ve referer eksik/harici olduğunda 404 döndürdüğü tespit edildi.
 * İlan detay sayfasının aslında doğrudan resmi işe alım PDF belgesi akıttığı (`application/pdf`) keşfedildi.

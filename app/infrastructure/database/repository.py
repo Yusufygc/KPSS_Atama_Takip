@@ -33,6 +33,9 @@ class AnnouncementRepository:
             except Exception:
                 pass
 
+        field_tags_raw = row["field_tags"] if "field_tags" in row.keys() else None
+        field_tags = json.loads(field_tags_raw) if field_tags_raw else []
+
         return Announcement(
             id=row["id"],
             hash_id=row["hash_id"],
@@ -49,6 +52,7 @@ class AnnouncementRepository:
             raw_content=row["raw_content"],
             matched_score_types=score_types,
             priority_level=PriorityLevel(row["priority_level"]),
+            field_tags=field_tags,
             is_notified=bool(row["is_notified"]),
             notified_at=row["notified_at"],
             created_at=row["created_at"],
@@ -65,13 +69,17 @@ class AnnouncementRepository:
     async def save(self, item: Announcement) -> Optional[int]:
         """Yeni bir ilanı kaydeder. İlan zaten varsa None döner (Mükerrer koruması)."""
         score_types_json = json.dumps([s.value for s in item.matched_score_types])
+        field_tags_json = json.dumps(item.field_tags)
+        is_it_val = 1 if item.is_it_field else 0
+
         sql = """
         INSERT OR IGNORE INTO announcements (
             hash_id, source_key, source_name, title, institution,
             position, city, url, pdf_url, publish_date, deadline_date,
             raw_content, matched_score_types, priority_level,
+            field_tags, is_it_field,
             is_notified, notified_at, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         async with get_db_connection(self.db_path) as conn:
             cursor = await conn.execute(
@@ -91,6 +99,8 @@ class AnnouncementRepository:
                     item.raw_content,
                     score_types_json,
                     item.priority_level.value,
+                    field_tags_json,
+                    is_it_val,
                     1 if item.is_notified else 0,
                     item.notified_at,
                     item.created_at,
@@ -111,13 +121,17 @@ class AnnouncementRepository:
         async with get_db_connection(self.db_path) as conn:
             for item in items:
                 score_types_json = json.dumps([s.value for s in item.matched_score_types])
+                field_tags_json = json.dumps(item.field_tags)
+                is_it_val = 1 if item.is_it_field else 0
+
                 sql = """
                 INSERT OR IGNORE INTO announcements (
                     hash_id, source_key, source_name, title, institution,
                     position, city, url, pdf_url, publish_date, deadline_date,
                     raw_content, matched_score_types, priority_level,
+                    field_tags, is_it_field,
                     is_notified, notified_at, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """
                 cursor = await conn.execute(
                     sql,
@@ -136,6 +150,8 @@ class AnnouncementRepository:
                         item.raw_content,
                         score_types_json,
                         item.priority_level.value,
+                        field_tags_json,
+                        is_it_val,
                         1 if item.is_notified else 0,
                         item.notified_at,
                         item.created_at,
@@ -181,6 +197,13 @@ class AnnouncementRepository:
             sub = " OR ".join("matched_score_types LIKE ?" for _ in params.score_types)
             conditions.append(f"({sub})")
             sql_params.extend([f"%{st.value}%" for st in params.score_types])
+
+        if params.only_it:
+            conditions.append("(is_it_field = 1 OR (field_tags IS NOT NULL AND field_tags != '[]'))")
+
+        if params.field_tag:
+            conditions.append("field_tags LIKE ?")
+            sql_params.append(f"%{params.field_tag.strip()}%")
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -263,6 +286,12 @@ class AnnouncementRepository:
             ) as cursor:
                 p1_p2_count = (await cursor.fetchone())[0] or 0
 
+            # Bilişim / Bilgisayar alanı sayısı
+            async with conn.execute(
+                "SELECT COUNT(*) FROM announcements WHERE is_it_field = 1 OR (field_tags IS NOT NULL AND field_tags != '[]');"
+            ) as cursor:
+                it_count = (await cursor.fetchone())[0] or 0
+
             # Portallara göre dağılım
             by_source: Dict[str, int] = {}
             async with conn.execute(
@@ -280,5 +309,6 @@ class AnnouncementRepository:
             p3_count=p3_count,
             p1_p2_count=p1_p2_count,
             general_count=max(0, general_count),
+            it_count=it_count,
             by_source=by_source,
         )

@@ -13,6 +13,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 from app.core.scoring.strategy import KPSSScoreMatcher
+from app.core.scoring.it_field_matcher import ITFieldMatcher, ITSubField
 from app.domain.models import PriorityLevel, ScoreType
 from app.infrastructure.database.connection import init_database
 from app.main import app
@@ -52,6 +53,18 @@ async def run_full_system_tests():
     assert exp_prio == PriorityLevel.PRIORITY_P3
     print(f"   [OK] Explicit Regex Match: {exp_scores} | Priority: {exp_prio.name}")
 
+    # 1.1 Test IT Field Matcher Engine
+    print("1.1 Testing ITFieldMatcher Engine...")
+    it_tags = ITFieldMatcher.match_tags(
+        title="TÜBİTAK BİLGEM Sözleşmeli Bilişim Personeli (Kıdemli Yazılım Geliştirici & Siber Güvenlik Uzmanı) Alımı",
+        institution="TÜBİTAK",
+    )
+    assert ITSubField.CONTRACTED_IT.value in it_tags
+    assert ITSubField.SOFTWARE.value in it_tags
+    assert ITSubField.CYBER_SECURITY.value in it_tags
+    assert ITFieldMatcher.is_it_announcement(tags=it_tags)
+    print(f"   [OK] IT Field Match: {it_tags}")
+
     # 2. Test FastAPI Endpoints via Async Client
     print("2. Testing FastAPI REST Endpoints...")
     await init_database()
@@ -82,7 +95,8 @@ async def run_full_system_tests():
         stats_resp = await client.get("/api/announcements/stats")
         assert stats_resp.status_code == 200
         stats_data = stats_resp.json()
-        print(f"   [OK] GET /api/announcements/stats: Total={stats_data['total_announcements']}")
+        assert "it_count" in stats_data
+        print(f"   [OK] GET /api/announcements/stats: Total={stats_data['total_announcements']}, IT={stats_data['it_count']}")
 
         # Test /api/announcements listing
         ann_resp = await client.get("/api/announcements?limit=10")
@@ -91,6 +105,16 @@ async def run_full_system_tests():
         assert "items" in ann_data
         assert "total" in ann_data
         print(f"   [OK] GET /api/announcements: {len(ann_data['items'])} items returned.")
+
+        # Test /api/announcements with IT filter
+        it_resp = await client.get("/api/announcements?only_it=true&limit=20")
+        assert it_resp.status_code == 200
+        it_data = it_resp.json()
+        assert it_data["total"] >= 1
+        for item in it_data["items"]:
+            assert item["is_it_field"] is True
+            assert len(item["field_tags"]) > 0
+        print(f"   [OK] GET /api/announcements?only_it=true: {it_data['total']} IT announcements found.")
 
         # Test Document Proxy / View Endpoint
         first_item = ann_data['items'][0]

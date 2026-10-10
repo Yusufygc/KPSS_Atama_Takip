@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS announcements (
     raw_content TEXT,
     matched_score_types TEXT,      -- JSON dizisi: '["P3"]'
     priority_level INTEGER DEFAULT 1,
+    field_tags TEXT,               -- JSON dizisi: '["Yazılım & Web", "Siber Güvenlik"]'
+    is_it_field INTEGER DEFAULT 0, -- 1: Bilgisayar/Bilişim, 0: Diğer
     is_notified INTEGER DEFAULT 0,
     notified_at TEXT,
     created_at TEXT NOT NULL
@@ -69,5 +71,16 @@ async def init_database(custom_path: Optional[Path] = None) -> None:
     """Veritabanı tablolarını ve indekslerini başlatır."""
     async with get_db_connection(custom_path) as conn:
         await conn.executescript(SCHEMA_SQL)
+
+        # Mevcut veritabanları için güvenli kolon kontrolü ve yükseltme (Migration)
+        async with conn.execute("PRAGMA table_info(announcements);") as cursor:
+            rows = await cursor.fetchall()
+            existing_cols = {row["name"] for row in rows}
+            if "field_tags" not in existing_cols:
+                await conn.execute("ALTER TABLE announcements ADD COLUMN field_tags TEXT;")
+            if "is_it_field" not in existing_cols:
+                await conn.execute("ALTER TABLE announcements ADD COLUMN is_it_field INTEGER DEFAULT 0;")
+
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_announcements_it ON announcements(is_it_field);")
         await conn.commit()
         logger.info("Veritabanı şeması ve indeksleri başarıyla doğrulandı.")

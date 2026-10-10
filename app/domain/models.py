@@ -54,6 +54,7 @@ class Announcement:
     raw_content: Optional[str] = None
     matched_score_types: List[ScoreType] = field(default_factory=list)
     priority_level: PriorityLevel = PriorityLevel.NORMAL
+    field_tags: List[str] = field(default_factory=list)
     is_notified: bool = False
     notified_at: Optional[str] = None
     created_at: str = field(
@@ -79,3 +80,8 @@ class Announcement:
     def has_career_score(self) -> bool:
         """İlanın P1 veya P2 puanı gerektirip gerektirmediğini döner."""
         return ScoreType.P1 in self.matched_score_types or ScoreType.P2 in self.matched_score_types
+
+    @property
+    def is_it_field(self) -> bool:
+        """İlanın Bilgisayar Mühendisliği / Bilişim / Yazılım alanı olup olmadığını döner."""
+        return bool(self.field_tags)

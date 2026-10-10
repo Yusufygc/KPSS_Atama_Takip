@@ -43,6 +43,8 @@ class AnnouncementResponse(BaseModel):
     matched_score_types: List[ScoreType] = []
     priority_level: PriorityLevel = PriorityLevel.NORMAL
     priority_icon: str = Field(default="")
+    field_tags: List[str] = Field(default_factory=list)
+    is_it_field: bool = False
     is_notified: bool = False
     notified_at: Optional[str] = None
     created_at: str
@@ -65,6 +67,8 @@ class AnnouncementResponse(BaseModel):
         if entity.source_key == "kamu_ilan_sbb":
             pdf_url = pdf_url or doc_url
 
+        field_tags = getattr(entity, "field_tags", []) or []
+
         return cls(
             id=entity.id or 0,
             hash_id=entity.hash_id,
@@ -83,6 +87,8 @@ class AnnouncementResponse(BaseModel):
             matched_score_types=entity.matched_score_types,
             priority_level=entity.priority_level,
             priority_icon=p_icon,
+            field_tags=field_tags,
+            is_it_field=bool(field_tags),
             is_notified=entity.is_notified,
             notified_at=entity.notified_at,
             created_at=entity.created_at,
@@ -97,6 +103,8 @@ class AnnouncementFilterParams(BaseModel):
     search_text: Optional[str] = None
     only_unnotified: bool = False
     only_p3: bool = False
+    only_it: bool = False
+    field_tag: Optional[str] = None
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 
@@ -123,4 +131,5 @@ class SystemStatsResponse(BaseModel):
     p3_count: int = 0
     p1_p2_count: int = 0
     general_count: int = 0
+    it_count: int = 0
     by_source: dict = Field(default_factory=dict)

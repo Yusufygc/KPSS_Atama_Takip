@@ -7,7 +7,8 @@
 const state = {
     searchText: '',
     selectedPortal: '',
-    scoreFilter: '', // '', 'P3', 'CAREER'
+    scoreFilter: localStorage.getItem('kpss_score_filter') || '', // '', 'IT', 'P3', 'CAREER'
+    selectedSubTag: localStorage.getItem('kpss_subtag') || '',
     limit: 20,
     offset: 0,
     total: 0,
@@ -22,10 +23,12 @@ const el = {
     themeIcon: document.getElementById('themeIcon'),
 
     // İstatistikler
+    statITCount: document.getElementById('statITCount'),
     statP3Count: document.getElementById('statP3Count'),
     statCareerCount: document.getElementById('statCareerCount'),
     statTotalCount: document.getElementById('statTotalCount'),
     statUnnotifiedCount: document.getElementById('statUnnotifiedCount'),
+    statCardIT: document.getElementById('statCardIT'),
     statCardP3: document.getElementById('statCardP3'),
     statCardCareer: document.getElementById('statCardCareer'),
     statCardTotal: document.getElementById('statCardTotal'),
@@ -34,6 +37,11 @@ const el = {
     searchInput: document.getElementById('searchInput'),
     portalFilter: document.getElementById('portalFilter'),
     scoreFilterGroup: document.getElementById('scoreFilterGroup'),
+    btnFilterIT: document.getElementById('btnFilterIT'),
+    itFilterBadge: document.getElementById('itFilterBadge'),
+    itSubTagsGroup: document.getElementById('itSubTagsGroup'),
+    quickTagButtons: document.querySelectorAll('.quick-tag-btn'),
+    subTagButtons: document.querySelectorAll('.subtag-btn'),
     resultCountText: document.getElementById('resultCountText'),
 
     // İlan Konteyneri ve Sayfalama
@@ -110,6 +118,8 @@ async function fetchStats() {
         if (!res.ok) return;
         const stats = await res.json();
 
+        if (el.statITCount) el.statITCount.textContent = stats.it_count || 0;
+        if (el.itFilterBadge) el.itFilterBadge.textContent = stats.it_count || 0;
         el.statP3Count.textContent = stats.p3_count || 0;
         el.statCareerCount.textContent = stats.p1_p2_count || 0;
         el.statTotalCount.textContent = stats.total_announcements || 0;
@@ -137,7 +147,12 @@ async function fetchAnnouncements() {
         if (state.searchText) query.append('search', state.searchText);
         if (state.selectedPortal) query.append('source_key', state.selectedPortal);
 
-        if (state.scoreFilter === 'P3') {
+        if (state.scoreFilter === 'IT') {
+            query.append('only_it', 'true');
+            if (state.selectedSubTag) {
+                query.append('field_tag', state.selectedSubTag);
+            }
+        } else if (state.scoreFilter === 'P3') {
             query.append('only_p3', 'true');
         } else if (state.scoreFilter === 'CAREER') {
             query.append('score_type', 'P1');
@@ -176,10 +191,23 @@ function renderAnnouncements(items) {
     }
 
     const html = items.map(item => {
-        // Öncelik şeridi sınıfı
+        // Öncelik şeridi sınıfı (Bilişim / Bilgisayar Müh. en öncelikli cyan vurgusu alır)
         let stripeClass = 'priority-normal-stripe';
-        if (item.priority_level === 3) stripeClass = 'priority-p3-stripe';
+        if (item.is_it_field) stripeClass = 'priority-it-stripe';
+        else if (item.priority_level === 3) stripeClass = 'priority-p3-stripe';
         else if (item.priority_level === 2) stripeClass = 'priority-career-stripe';
+
+        // Bilişim & Bölüm Rozeti
+        const itBadge = item.is_it_field ? `
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-cyan-100 dark:bg-cyan-950/80 text-cyan-800 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-700 shadow-xs">
+                💻 Bilişim & Yazılım
+            </span>
+        ` : '';
+
+        // Alt Uzmanlık Etiketleri
+        const fieldTagsHtml = (item.field_tags || []).map(tag => {
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-cyan-50 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/60">${tag}</span>`;
+        }).join(' ');
 
         // Puan Rozetleri
         const scoreBadges = (item.matched_score_types || []).map(score => {
@@ -205,6 +233,13 @@ function renderAnnouncements(items) {
             <span class="inline-flex items-center text-xs text-slate-500 dark:text-slate-400 font-medium">
                 <span class="mr-1">📍</span> ${item.city}
             </span>
+        ` : '';
+
+        // PDF Belge Butonu
+        const pdfButton = item.document_url ? `
+            <a href="${item.document_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Resmi Belgeyi / PDF Aç">
+                <span>📄 PDF</span>
+            </a>
         ` : '';
 
         // Aksiyon Butonları
@@ -239,6 +274,7 @@ function renderAnnouncements(items) {
                             <span class="inline-flex items-center text-xs font-semibold text-slate-500 dark:text-slate-400">
                                 <span class="mr-1 text-sm">${item.source_icon}</span> ${item.source_name}
                             </span>
+                            ${itBadge}
                             ${scoreBadges}
                             ${cityBadge}
                         </div>
@@ -252,6 +288,9 @@ function renderAnnouncements(items) {
                                 ${item.title}
                             </h2>
                         </div>
+
+                        <!-- Bilişim Alt Alan Etiketleri (varsa) -->
+                        ${fieldTagsHtml ? `<div class="flex flex-wrap items-center gap-1.5 pt-1">${fieldTagsHtml}</div>` : ''}
                     </div>
 
                     <!-- Sağ Taraf: Tarih ve Butonlar -->
@@ -396,6 +435,46 @@ async function testTelegram() {
     }
 }
 
+// UI Filtre Durumunu Güncelle
+function updateScoreFilterUI(selectedScore) {
+    el.scoreFilterGroup.querySelectorAll('.score-btn').forEach(b => {
+        b.classList.remove('bg-slate-900', 'dark:bg-white', 'text-white', 'dark:text-slate-900', 'bg-cyan-600', 'dark:bg-cyan-600');
+        if (b.dataset.score === 'IT') {
+            b.classList.add('bg-cyan-50', 'dark:bg-cyan-950/50', 'text-cyan-700', 'dark:text-cyan-300');
+        } else if (b.dataset.score === 'P3') {
+            b.classList.add('bg-indigo-50', 'dark:bg-indigo-950/50', 'text-indigo-700', 'dark:text-indigo-300');
+        } else if (b.dataset.score === 'CAREER') {
+            b.classList.add('bg-amber-50', 'dark:bg-amber-950/50', 'text-amber-700', 'dark:text-amber-300');
+        } else {
+            b.classList.add('text-slate-700', 'dark:text-slate-300');
+        }
+    });
+
+    const activeBtn = el.scoreFilterGroup.querySelector(`[data-score="${selectedScore}"]`);
+    if (activeBtn) {
+        if (selectedScore === 'IT') {
+            activeBtn.classList.remove('bg-cyan-50', 'dark:bg-cyan-950/50', 'text-cyan-700', 'dark:text-cyan-300');
+            activeBtn.classList.add('bg-cyan-600', 'dark:bg-cyan-600', 'text-white', 'dark:text-white');
+            if (el.itSubTagsGroup) el.itSubTagsGroup.classList.remove('hidden');
+        } else {
+            if (el.itSubTagsGroup) el.itSubTagsGroup.classList.add('hidden');
+            activeBtn.classList.remove('text-slate-700', 'dark:text-slate-300', 'bg-indigo-50', 'dark:bg-indigo-950/50', 'bg-amber-50', 'dark:bg-amber-950/50');
+            activeBtn.classList.add('bg-slate-900', 'dark:bg-white', 'text-white', 'dark:text-slate-900');
+        }
+    }
+}
+
+// Bilişim Alt Dal Çiplerini Güncelle
+function updateSubTagUI(selectedTag) {
+    document.querySelectorAll('.subtag-btn').forEach(btn => {
+        if (btn.dataset.tag === selectedTag) {
+            btn.className = 'subtag-btn active px-2.5 py-1 text-xs font-bold rounded-lg bg-cyan-600 text-white shadow-sm transition-colors';
+        } else {
+            btn.className = 'subtag-btn px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-cyan-900/40 border border-slate-200 dark:border-slate-700 transition-colors';
+        }
+    });
+}
+
 // Olay Dinleyicileri (Event Listeners)
 function setupEventListeners() {
     // Tema Değiştirici
@@ -419,23 +498,54 @@ function setupEventListeners() {
         fetchAnnouncements();
     });
 
-    // Hızlı Puan Butonları
+    // Hızlı Filtre Butonları (Puan & Bölümüm)
     el.scoreFilterGroup.querySelectorAll('.score-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            el.scoreFilterGroup.querySelectorAll('.score-btn').forEach(b => {
-                b.classList.remove('bg-slate-900', 'dark:bg-white', 'text-white', 'dark:text-slate-900');
-                b.classList.add('text-slate-700', 'dark:text-slate-300');
-            });
-            btn.classList.add('bg-slate-900', 'dark:bg-white', 'text-white', 'dark:text-slate-900');
-            btn.classList.remove('text-slate-700', 'dark:text-slate-300');
-
             state.scoreFilter = btn.dataset.score;
+            localStorage.setItem('kpss_score_filter', state.scoreFilter);
+            
+            if (state.scoreFilter !== 'IT') {
+                state.selectedSubTag = '';
+                localStorage.removeItem('kpss_subtag');
+                updateSubTagUI('');
+            }
+            
+            updateScoreFilterUI(state.scoreFilter);
             state.offset = 0;
             fetchAnnouncements();
         });
     });
 
+    // Bilişim Alt Branş Çipleri Dinleyicisi
+    document.querySelectorAll('.subtag-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            state.selectedSubTag = btn.dataset.tag;
+            localStorage.setItem('kpss_subtag', state.selectedSubTag);
+            updateSubTagUI(state.selectedSubTag);
+            state.offset = 0;
+            fetchAnnouncements();
+        });
+    });
+
+    // Hızlı Arama Butonları
+    document.querySelectorAll('.quick-tag-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const query = btn.dataset.query;
+            el.searchInput.value = query;
+            state.searchText = query;
+            state.offset = 0;
+            showToast(`"${query}" için arama yapılıyor...`, 'info');
+            fetchAnnouncements();
+        });
+    });
+
     // İstatistik Kartlarına Tıklayarak Filtreleme
+    if (el.statCardIT) {
+        el.statCardIT.addEventListener('click', () => {
+            if (el.btnFilterIT) el.btnFilterIT.click();
+        });
+    }
+
     el.statCardP3.addEventListener('click', () => {
         const p3Btn = el.scoreFilterGroup.querySelector('[data-score="P3"]');
         if (p3Btn) p3Btn.click();
@@ -491,6 +601,8 @@ function setupEventListeners() {
 // Uygulamayı Başlat
 document.addEventListener('DOMContentLoaded', () => {
     applyTheme(state.theme);
+    updateScoreFilterUI(state.scoreFilter);
+    updateSubTagUI(state.selectedSubTag);
     setupEventListeners();
     fetchStats();
     fetchScraperStatuses();

@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple
 
 from app.core.constants.strings import MessageStrings
 from app.core.logging import get_logger
+from app.core.scoring.it_field_matcher import ITFieldMatcher
 from app.core.scoring.strategy import KPSSScoreMatcher
 from app.domain.models import Announcement, PriorityLevel, ScoreType
 from app.domain.schemas import (
@@ -51,6 +52,14 @@ class AnnouncementService:
                     raw_content=dto.raw_content or "",
                 )
 
+                # 2. Bilgisayar Mühendisliği ve Bilişim Alan Tespiti
+                it_tags = ITFieldMatcher.match_tags(
+                    title=dto.title,
+                    institution=dto.institution,
+                    position=dto.position or "",
+                    raw_content=dto.raw_content or "",
+                )
+
                 entity = Announcement(
                     source_key=dto.source_key,
                     source_name=dto.source_name,
@@ -65,6 +74,7 @@ class AnnouncementService:
                     raw_content=dto.raw_content,
                     matched_score_types=scores,
                     priority_level=priority,
+                    field_tags=it_tags,
                 )
 
                 # 2. Mükerrer Kontrolü ve Kayıt

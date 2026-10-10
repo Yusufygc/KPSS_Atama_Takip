@@ -24,6 +24,10 @@ body {
     border-left: 4px solid #f97316;
 }
 
+.priority-it-stripe {
+    border-left: 4px solid #06b6d4;
+}
+
 .priority-normal-stripe {
     border-left: 4px solid #94a3b8;
 }
@@ -35,6 +39,10 @@ body {
 
 .dark .priority-career-stripe {
     border-left: 4px solid #fb923c;
+}
+
+.dark .priority-it-stripe {
+    border-left: 4px solid #22d3ee;
 }
 
 .dark .priority-normal-stripe {
