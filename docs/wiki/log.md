@@ -4,6 +4,15 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-10] PHASE 2 COMPLETE | Domain Modelleri ve Asenkron SQLite Repository İnşa Edildi
+* `Announcement` ana domain varlığı, `ScoreType` (P3, P1, P2) ve `PriorityLevel` modelleri kodlandı (`models.py`).
+* Deterministik SHA-256 hash parmak izi ile mükerrer ilan önleme mantığı uygulandı.
+* API ve sunum katmanı için Pydantic DTO'ları (`schemas.py`) yazıldı (`AnnouncementResponse`, `AnnouncementFilterParams`, `SystemStatsResponse`).
+* `aiosqlite` ile WAL modunda çalışan asenkron bağlantı ve şema yöneticisi (`connection.py`) kuruldu.
+* Repository Pattern uygulandı (`AnnouncementRepository`): Mükerrer önleme, toplu kayıt, P3/P1/P2 filtreleme, okunmamış bildirim yönetimi ve istatistik hesaplama test edildi.
+* `tests/test_repository.py` ile tüm veritabanı ve model işlevleri uçtan uca doğrulandı.
+* Bağlantılar: [[architecture]], [[rules]], [[kpss_scoring]]
+
 ## [2026-10-10] PHASE 1 COMPLETE | Core Temelleri İnşa Edildi ve Doğrulandı
 * Tip güvenli `AppSettings` (`app/config.py`) ve `.env` şablonu oluşturuldu.
 * Merkezi sabitler (`strings.py`, `icons.py`, `settings.py`) hardcode ve magic number yasağına uygun kodlandı.

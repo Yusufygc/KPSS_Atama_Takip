@@ -1,0 +1,73 @@
+"""KPSS Atama Takip - Asenkron SQLite Bağlantı ve Şema Yönetimi."""
+
+import json
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import AsyncGenerator, Optional
+import aiosqlite
+
+from app.config import settings
+from app.core.exceptions.database import DatabaseException
+from app.core.logging import get_logger
+
+logger = get_logger("database.connection")
+
+SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hash_id TEXT UNIQUE NOT NULL,
+    source_key TEXT NOT NULL,
+    source_name TEXT NOT NULL,
+    title TEXT NOT NULL,
+    institution TEXT NOT NULL,
+    position TEXT,
+    city TEXT,
+    url TEXT NOT NULL,
+    pdf_url TEXT,
+    publish_date TEXT,
+    deadline_date TEXT,
+    raw_content TEXT,
+    matched_score_types TEXT,      -- JSON dizisi: '["P3"]'
+    priority_level INTEGER DEFAULT 1,
+    is_notified INTEGER DEFAULT 0,
+    notified_at TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_announcements_hash ON announcements(hash_id);
+CREATE INDEX IF NOT EXISTS idx_announcements_source ON announcements(source_key);
+CREATE INDEX IF NOT EXISTS idx_announcements_notified ON announcements(is_notified);
+CREATE INDEX IF NOT EXISTS idx_announcements_priority ON announcements(priority_level);
+"""
+
+
+@asynccontextmanager
+async def get_db_connection(
+    custom_path: Optional[Path] = None,
+) -> AsyncGenerator[aiosqlite.Connection, None]:
+    """Asenkron SQLite bağlantısı sağlayan güvenli context manager.
+    
+    WAL (Write-Ahead Logging) modunu açarak eşzamanlı okuma/yazma kilitlenmelerini önler.
+    """
+    db_path = custom_path or settings.resolved_database_path
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        async with aiosqlite.connect(str(db_path)) as conn:
+            conn.row_factory = aiosqlite.Row
+            # Performans ve eşzamanlılık pragma ayarları
+            await conn.execute("PRAGMA journal_mode = WAL;")
+            await conn.execute("PRAGMA synchronous = NORMAL;")
+            await conn.execute("PRAGMA foreign_keys = ON;")
+            yield conn
+    except Exception as e:
+        logger.error(f"Veritabanı bağlantı hatası ({db_path}): {e}")
+        raise DatabaseException(f"Veritabanı bağlantısı kurulamadı: {e}") from e
+
+
+async def init_database(custom_path: Optional[Path] = None) -> None:
+    """Veritabanı tablolarını ve indekslerini başlatır."""
+    async with get_db_connection(custom_path) as conn:
+        await conn.executescript(SCHEMA_SQL)
+        await conn.commit()
+        logger.info("Veritabanı şeması ve indeksleri başarıyla doğrulandı.")
