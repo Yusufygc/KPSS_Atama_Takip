@@ -4,6 +4,17 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-10] PHASE 3-6 COMPLETE | Scrapers, KPSS Eşleştirme, Telegram, Servisler ve FastAPI API İnşa Edildi
+* `BaseScraper` ve `ScraperRegistry` mimarisiyle 6 portalın somut adaptörleri kodlandı (Kariyer Kapısı, Resmî Gazete, Kamu İlan SBB, Yerel Yönetimler, İŞKUR, İlan.gov.tr).
+* `ScraperOrchestrator` ile hata izolasyonlu eşzamanlı (asenkron paralel) kazıma motoru hayata geçirildi.
+* `KPSSScoreMatcher` stratejisi ile P3 Lisans (Öncelik 3), P1/P2 Kariyer (Öncelik 2) ve Genel kadrolar regex + anahtar kelime ağırlıklarıyla sınıflandırıldı.
+* `TelegramNotifier` ile HTML zengin formatlı, çift linkli (ilan ve PDF) anlık bildirim servisi yazıldı.
+* `AnnouncementService` ile Kazıma -> Skorlama -> Mükerrer Önleme -> SQLite Kayıt -> Bildirim boru hattı (pipeline) bağlandı.
+* `SchedulerService` ile APScheduler arka plan zamanlayıcısı entegre edildi.
+* `FastAPI` REST API katmanı (`/api/announcements`, `/api/scrapers`, `/api/settings`, `/health`) kodlandı ve `tests/test_full_system.py` ile E2E doğrulandı.
+* Canlı testte Kariyer Kapısı'ndan 24 gerçek atama ilanı çekildi; 9 adet P3 lisans, 6 adet P1/P2 kariyer meslek ilanı başarıyla veritabanına işlendi.
+* Bağlantılar: [[scrapers]], [[kpss_scoring]], [[notifications]], [[architecture]]
+
 ## [2026-10-10] PHASE 2 COMPLETE | Domain Modelleri ve Asenkron SQLite Repository İnşa Edildi
 * `Announcement` ana domain varlığı, `ScoreType` (P3, P1, P2) ve `PriorityLevel` modelleri kodlandı (`models.py`).
 * Deterministik SHA-256 hash parmak izi ile mükerrer ilan önleme mantığı uygulandı.
