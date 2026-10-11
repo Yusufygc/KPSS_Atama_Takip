@@ -218,10 +218,11 @@ class AnnouncementRepository:
         # where_clause yalnızca sabit koşul ve ? yer tutucularından oluşur; kullanıcı girdisi parametre olarak geçer
         count_sql = f"SELECT COUNT(*) FROM announcements {where_clause};"  # noqa: S608  # nosec B608
 
-        # Sayfalanmış veri sorgusu (Öncelikli P3 en üstte, ardından son tarihe göre)
+        # Sayfalanmış veri sorgusu: önce süresi dolmamışlar, sonra öncelik (P3 en üstte), sonra en yeni
         data_sql = (
             f"SELECT * FROM announcements {where_clause} "  # noqa: S608  # nosec B608
-            "ORDER BY priority_level DESC, id DESC LIMIT ? OFFSET ?;"
+            "ORDER BY (deadline_on IS NOT NULL AND deadline_on < ?) ASC, priority_level DESC, id DESC "
+            "LIMIT ? OFFSET ?;"
         )
 
         async with get_db_connection(self.db_path) as conn:
@@ -231,7 +232,7 @@ class AnnouncementRepository:
                 total_count = total_row[0] if total_row else 0
 
             # Sayfa kayıtları
-            data_params = list(sql_params) + [params.limit, params.offset]
+            data_params = [*sql_params, today_in_turkey().isoformat(), params.limit, params.offset]
             async with conn.execute(data_sql, data_params) as cursor:
                 rows = await cursor.fetchall()
                 items = [self._row_to_entity(r) for r in rows]

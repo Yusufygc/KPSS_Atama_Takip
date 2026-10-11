@@ -135,3 +135,21 @@ async def test_api_only_active_param_and_fields(client):
     assert active["items"][0]["is_expired"] is False and active["items"][0]["deadline_on"]
     stats = (await client.get("/api/announcements/stats?only_active=true")).json()
     assert stats["total_announcements"] == 1
+
+
+async def test_expired_items_are_listed_after_active_ones_regardless_of_priority(db_ready):
+    repo = AnnouncementRepository()
+    today = today_in_turkey()
+    await repo.save_many(
+        [
+            make("gecmis-p3", deadline_date="x", deadline_on=(today - timedelta(days=1)).isoformat()),
+            make("aktif", deadline_date="x", deadline_on=(today + timedelta(days=1)).isoformat()),
+            make("tarihsiz"),
+        ]
+    )
+    items, _ = await repo.list_announcements(AnnouncementFilterParams())
+    assert [i.title for i in items][-1] == "gecmis-p3"
+
+    # Filtre parametreleriyle birlikte de sıralama parametreleri doğru bağlanmalı
+    items, total = await repo.list_announcements(AnnouncementFilterParams(search_text="aktif", only_active=True, limit=1))
+    assert total == 1 and items[0].title == "aktif"

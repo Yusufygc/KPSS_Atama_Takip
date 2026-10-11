@@ -11,6 +11,7 @@ const state = {
     selectedPortal: localStorage.getItem('kpss_portal') || '',
     scoreFilter: localStorage.getItem('kpss_score_filter') || '', // '', 'IT', 'P3', 'CAREER'
     selectedSubTag: localStorage.getItem('kpss_subtag') || '',
+    onlyActive: localStorage.getItem('kpss_only_active') !== 'false', // varsayılan: süresi dolanları gizle
     limit: 20,
     offset: 0,
     total: 0,
@@ -46,6 +47,7 @@ const el = {
     itFilterBadge: document.getElementById('itFilterBadge'),
     itSubTagsGroup: document.getElementById('itSubTagsGroup'),
     resultCountText: document.getElementById('resultCountText'),
+    onlyActiveToggle: document.getElementById('onlyActiveToggle'),
 
     // İlan Konteyneri ve Sayfalama
     announcementsContainer: document.getElementById('announcementsContainer'),
@@ -92,6 +94,30 @@ function safeUrl(value) {
         return '#';
     }
 }
+
+// Son başvuru gününü okunur biçime çevirir; kalan gün ve süre durumunu da döner
+function describeDeadline(item) {
+    if (!item.deadline_on) {
+        return item.deadline_date ? { text: item.deadline_date, tone: 'neutral' } : null;
+    }
+    const [y, m, d] = item.deadline_on.split('-').map(Number);
+    const deadline = new Date(y, m - 1, d);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const daysLeft = Math.round((deadline - today) / 86400000);
+    const label = deadline.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    if (item.is_expired || daysLeft < 0) return { text: `${label} · süresi doldu`, tone: 'expired' };
+    if (daysLeft === 0) return { text: `${label} · son gün`, tone: 'urgent' };
+    if (daysLeft <= 3) return { text: `${label} · ${daysLeft} gün kaldı`, tone: 'urgent' };
+    return { text: `${label} · ${daysLeft} gün kaldı`, tone: 'neutral' };
+}
+
+const DEADLINE_TONE_CLASSES = {
+    neutral: 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800',
+    urgent: 'text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/60',
+    expired: 'text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 line-through decoration-rose-400/60',
+};
 
 // Yönetim uç noktaları için X-API-Key başlığı ekleyen fetch sarmalayıcısı
 const API_KEY_STORAGE = 'kpss_api_key';
@@ -164,7 +190,7 @@ function showToast(message, type = 'info') {
 // 1. Şehirleri API'den Çek ve Doldur
 async function fetchCities() {
     try {
-        const res = await fetch('/api/announcements/cities');
+        const res = await fetch(`/api/announcements/cities?only_active=${state.onlyActive}`);
         if (!res.ok) return;
         const cities = await res.json();
 
@@ -187,7 +213,7 @@ async function fetchCities() {
 // 2. İstatistikleri Çek
 async function fetchStats() {
     try {
-        const res = await fetch('/api/announcements/stats');
+        const res = await fetch(`/api/announcements/stats?only_active=${state.onlyActive}`);
         if (!res.ok) return;
         const stats = await res.json();
 
@@ -203,7 +229,14 @@ async function fetchStats() {
 }
 
 // 3. İlanları Listele
+let announcementsAbort = null;
+
 async function fetchAnnouncements() {
+    // Hızlı filtre değişimlerinde eski yanıtın yenisinin üzerine yazmaması için önceki istek iptal edilir
+    if (announcementsAbort) announcementsAbort.abort();
+    const controller = new AbortController();
+    announcementsAbort = controller;
+
     el.announcementsContainer.innerHTML = `
         <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center text-slate-400 dark:text-slate-500">
             <div class="inline-flex items-center justify-center animate-spin mb-2">
@@ -216,7 +249,8 @@ async function fetchAnnouncements() {
     try {
         const query = new URLSearchParams({
             limit: state.limit,
-            offset: state.offset
+            offset: state.offset,
+            only_active: state.onlyActive
         });
 
         if (state.searchText) query.append('search', state.searchText);
@@ -235,14 +269,16 @@ async function fetchAnnouncements() {
             query.append('score_type', 'P2');
         }
 
-        const res = await fetch(`/api/announcements?${query.toString()}`);
+        const res = await fetch(`/api/announcements?${query.toString()}`, { signal: controller.signal });
         if (!res.ok) throw new Error('Sunucu yanıt vermedi');
         const data = await res.json();
+        if (controller !== announcementsAbort) return; // daha yeni bir istek başlatıldı
 
         state.total = data.total;
         renderAnnouncements(data.items);
         updatePagination(data.total);
     } catch (err) {
+        if (err.name === 'AbortError' || controller !== announcementsAbort) return;
         el.announcementsContainer.innerHTML = `
             <div class="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-2xl p-6 text-center text-rose-700 dark:text-rose-300 text-xs">
                 İlanlar getirilirken bir hata oluştu: ${escapeHtml(err.message)}
@@ -312,10 +348,11 @@ function renderAnnouncements(items) {
         }).join(' ');
 
         // Tarih Bilgisi
-        const deadlineBadge = item.deadline_date ? `
-            <div class="flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg space-x-1.5">
+        const deadlineInfo = describeDeadline(item);
+        const deadlineBadge = deadlineInfo ? `
+            <div class="flex items-center text-xs font-semibold px-2.5 py-1 rounded-lg space-x-1.5 ${DEADLINE_TONE_CLASSES[deadlineInfo.tone]}">
                 ${SVG_ICONS.calendar}
-                <span>Son Başvuru: ${escapeHtml(item.deadline_date)}</span>
+                <span>Son Başvuru: ${escapeHtml(deadlineInfo.text)}</span>
             </div>
         ` : '';
 
@@ -453,39 +490,79 @@ async function fetchScraperStatuses() {
     }
 }
 
-// 5. Şimdi Tara Tetikleme
+// 5. Şimdi Tara Tetikleme (arka planda başlar, durum sorgulanır)
+const SCRAPE_POLL_INTERVAL_MS = 2000;
+const SCRAPE_POLL_MAX_MS = 6 * 60 * 1000;
+
+function setScrapingUI(running) {
+    state.isScraping = running;
+    el.btnTriggerScrape.disabled = running;
+    el.scrapeBtnIcon.classList.toggle('animate-spin-custom', running);
+    el.scrapeBtnText.textContent = running ? 'Taranıyor...' : 'Şimdi Tara';
+}
+
+async function refreshAllData() {
+    await Promise.all([fetchStats(), fetchCities(), fetchScraperStatuses()]);
+    await fetchAnnouncements();
+}
+
+async function pollScrapeUntilDone() {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < SCRAPE_POLL_MAX_MS) {
+        await new Promise(resolve => setTimeout(resolve, SCRAPE_POLL_INTERVAL_MS));
+        const res = await fetch('/api/scrapers/run/status');
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (!data.running) return data.last_cycle;
+    }
+    return null;
+}
+
 async function triggerScrape() {
     if (state.isScraping) return;
-    state.isScraping = true;
-
-    el.btnTriggerScrape.disabled = true;
-    el.scrapeBtnIcon.classList.add('animate-spin-custom');
-    el.scrapeBtnText.textContent = 'Taranıyor...';
-
+    setScrapingUI(true);
     showToast('Tüm kamu portalları taranıyor...', 'info');
 
     try {
         const res = await apiFetch('/api/scrapers/run', { method: 'POST' });
         const data = await res.json().catch(() => ({}));
 
-        if (!res.ok) {
+        // 409: zaten bir tarama çalışıyor (zamanlayıcı veya başka sekme); bitmesini bekleriz
+        if (!res.ok && res.status !== 409) {
             showToast(data.detail || 'Tarama başlatılamadı.', 'error');
-        } else if (data.success) {
-            showToast(`Tarama tamamlandı! ${data.new_announcements} yeni ilan eklendi.`, 'success');
-            await fetchStats();
-            await fetchCities();
-            await fetchScraperStatuses();
-            await fetchAnnouncements();
-        } else {
-            showToast('Tarama sırasında bir sorun oluştu.', 'error');
+            return;
         }
+
+        const cycle = await pollScrapeUntilDone();
+        if (cycle && cycle.error) {
+            showToast(`Tarama başarısız: ${cycle.error}`, 'error');
+        } else if (cycle) {
+            showToast(`Tarama tamamlandı! ${cycle.new_announcements} yeni ilan eklendi.`, 'success');
+        } else {
+            showToast('Tarama beklenenden uzun sürüyor; sonuçlar hazır olunca yenilenecek.', 'info');
+        }
+        await refreshAllData();
     } catch (err) {
         showToast(`Tarama başarısız: ${err.message}`, 'error');
     } finally {
-        state.isScraping = false;
-        el.btnTriggerScrape.disabled = false;
-        el.scrapeBtnIcon.classList.remove('animate-spin-custom');
-        el.scrapeBtnText.textContent = 'Şimdi Tara';
+        setScrapingUI(false);
+    }
+}
+
+// Sayfa açıldığında bir tarama zaten sürüyorsa (zamanlayıcı) düğmeyi buna göre göster
+async function resumeScrapeIfRunning() {
+    try {
+        const res = await fetch('/api/scrapers/run/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.running && !state.isScraping) {
+            setScrapingUI(true);
+            await pollScrapeUntilDone();
+            setScrapingUI(false);
+            await refreshAllData();
+        }
+    } catch (_) {
+        // durum sorgusu başarısızsa sessizce devam et
     }
 }
 
@@ -659,6 +736,19 @@ function setupEventListeners() {
         fetchAnnouncements();
     });
 
+    // Süresi dolanları gizle anahtarı
+    if (el.onlyActiveToggle) {
+        el.onlyActiveToggle.checked = state.onlyActive;
+        el.onlyActiveToggle.addEventListener('change', (e) => {
+            state.onlyActive = e.target.checked;
+            localStorage.setItem('kpss_only_active', String(state.onlyActive));
+            state.offset = 0;
+            fetchStats();
+            fetchCities();
+            fetchAnnouncements();
+        });
+    }
+
     // Tüm Filtreleri Sıfırla Butonu
     el.btnResetAllFilters.addEventListener('click', resetAllFilters);
 
@@ -766,4 +856,5 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchCities();
     fetchScraperStatuses();
     fetchAnnouncements();
+    resumeScrapeIfRunning();
 });
