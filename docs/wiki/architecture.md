@@ -71,3 +71,10 @@ flowchart TD
 * **Arka Plan Servisi:** `APScheduler` belirlenen periyotlarda (örn. 15 dakikada bir) taramayı tetikler. Ayrıca Web arayüzünden istenildiği an "Şimdi Tara" butonuyla manuel tetikleme yapılabilir.
 
 Bağlantılar: [[rules]], [[scrapers]], [[kpss_scoring]], [[notifications]]
+
+
+## 4. Arama ve Etiket Depolama Notları
+* **Türkçe duyarlı arama:** SQLite `LIKE` yalnızca ASCII için büyük/küçük harf duyarsızdır. Bu yüzden her kayıtta başlık+kurum+unvanın katlanmış hali `search_text` sütununda saklanır (`fold_turkish`: "MÜHENDİS" = "mühendis" = "muhendis"); sorgu da aynı şekilde katlanır.
+* **Etiketler:** `field_tags` JSON'u `ensure_ascii=False` ile yazılır ve filtre `"Etiket"` biçiminde tırnaklı tam eşleşme yapar. Eski kaçışlı kayıtlar açılışta onarılır.
+* **Hata kodları:** Alan istisnaları `http_status` taşır (DB 500, kazıyıcı/bildirim 502, doğrulama 422, çakışma 409). 5xx yanıtlarında ayrıntı istemciye sızdırılmaz.
+* **Tek servis örneği:** API ve zamanlayıcı aynı `AnnouncementService` nesnesini paylaşır; tarama kilidi ve portal durumları tek yerde tutulur.

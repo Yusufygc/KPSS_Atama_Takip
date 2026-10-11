@@ -1,24 +1,57 @@
 """KPSS Atama Takip - KPSS Puan Türü Eşleştirme ve Öncelik Stratejisi."""
 
 import re
-from typing import List, Tuple
+from typing import List, Pattern, Tuple
 
 from app.core.text import turkish_upper
 from app.domain.models import PriorityLevel, ScoreType
+
+# Anahtar kelime başlangıcında harf/rakam bulunmamalı: "4/B" ifadesi "2024/B" içinde,
+# "MİMAR" ifadesi kelime ortasında eşleşmesin. Sonek serbesttir (MÜHENDİS -> MÜHENDİSİ / MÜHENDİSLİĞİ).
+_WORD_START = r"(?<![A-ZÇĞİÖŞÜ0-9])"
+
+
+def _keyword_patterns(keywords: List[str]) -> List[Pattern[str]]:
+    return [re.compile(_WORD_START + re.escape(kw)) for kw in keywords]
+
+
+def _score_pattern(label: str) -> Pattern[str]:
+    """P1/P2/P3 için açık yazım biçimlerini yakalar: KPSS P3, KPSSP3, KPSS-P3, KPSS (P3), P-3, P3 puan."""
+    n = label[1]
+    return re.compile(
+        rf"KPSS[\s\-:(]*P\s*-?\s*{n}(?!\d)"  # KPSS P3 / KPSSP3 / KPSS-P3 / KPSS (P3) / KPSS P-3
+        rf"|{_WORD_START}P\s*-?\s*{n}\s*(?:PUAN|\))"  # P3 puan / (P3)
+        rf"|{_WORD_START}P-{n}(?!\d)"  # P-3
+    )
 
 
 class KPSSScoreMatcher:
     """İlan metninden (başlık, kurum, unvan) KPSS puan türünü ve önceliğini tespit eden strateji motoru."""
 
-    # Açıkça belirtilen puan kalıpları (Regex)
-    P3_REGEX = re.compile(r"\b(KPSS\s*P\s*3|KPSSP3|P3\s*PUAN|P-3)\b", re.IGNORECASE)
-    P1_REGEX = re.compile(r"\b(KPSS\s*P\s*1|KPSSP1|P1\s*PUAN|P-1)\b", re.IGNORECASE)
-    P2_REGEX = re.compile(r"\b(KPSS\s*P\s*2|KPSSP2|P2\s*PUAN|P-2)\b", re.IGNORECASE)
+    # Açıkça belirtilen puan kalıpları (metin büyük harfe çevrildikten sonra aranır)
+    P3_REGEX = _score_pattern("P3")
+    P1_REGEX = _score_pattern("P1")
+    P2_REGEX = _score_pattern("P2")
+
+    # KPSS puanıyla alınmayan ilan türleri: akademik kadro (ALES / ilan şartları ayrı) ve işçi alımları.
+    # Bu ifadeler varsa ilan örtük (unvan bazlı) olarak P1/P2/P3 sayılmaz.
+    NON_KPSS_KEYWORDS = [
+        "ÖĞRETİM ÜYESİ",
+        "ÖĞRETİM GÖREVLİSİ",
+        "ARAŞTIRMA GÖREVLİSİ",
+        "DOKTOR ÖĞRETİM",
+        "PROFESÖR",
+        "DOÇENT",
+        "DOÇ. DR",
+        "DR. ÖĞR",
+        "SÜREKLİ İŞÇİ",
+        "GEÇİCİ İŞÇİ",
+        "İŞÇİ ALIMI",
+    ]
 
     # P3 ile doğrudan ilişkili B Grubu Lisans unvan ve anahtar kelimeleri
     P3_KEYWORDS = [
         "MÜHENDİS",
-        "MÜHENDİSLİĞİ",
         "BİLİŞİM PERSONELİ",
         "PROGRAMCI",
         "ÇÖZÜMLEYİCİ",
@@ -36,12 +69,12 @@ class KPSSScoreMatcher:
         "KÜTÜPHANECİ",
         "PSİKOLOG",
         "SOSYOLOG",
-        "4/B",
-        "4-B",
         "SÖZLEŞMELİ PERSONEL",
         "LİSANS DÜZEYİ",
         "LİSANS MEZUNU",
     ]
+    # Rakam içeren kalıplar: "4/B", "4-B", "4 / B" (ancak "2024/B" değil)
+    P3_EXTRA_PATTERNS = [re.compile(_WORD_START + r"4\s*[/\-]\s*B(?![A-ZÇĞİÖŞÜ])")]
 
     # P1 ve P2 ile ilişkili A Grubu Kariyer unvan ve anahtar kelimeleri
     CAREER_P1_P2_KEYWORDS = [
@@ -59,6 +92,10 @@ class KPSSScoreMatcher:
         "A GRUBU",
     ]
 
+    _NON_KPSS_PATTERNS = _keyword_patterns(NON_KPSS_KEYWORDS)
+    _P3_PATTERNS = _keyword_patterns(P3_KEYWORDS) + P3_EXTRA_PATTERNS
+    _CAREER_PATTERNS = _keyword_patterns(CAREER_P1_P2_KEYWORDS)
+
     @classmethod
     def match(
         cls,
@@ -70,26 +107,19 @@ class KPSSScoreMatcher:
         full_text = turkish_upper(f"{title} {institution} {raw_content}")
         matched_scores: List[ScoreType] = []
 
-        # 1. Açık (Explicit) Puan Kontrolü
-        has_explicit_p3 = bool(cls.P3_REGEX.search(full_text))
-        has_explicit_p1 = bool(cls.P1_REGEX.search(full_text))
-        has_explicit_p2 = bool(cls.P2_REGEX.search(full_text))
-
-        if has_explicit_p3:
+        # 1. Açık (Explicit) Puan Kontrolü: ilan puan türünü kendisi yazıyorsa her zaman geçerlidir
+        if cls.P3_REGEX.search(full_text):
             matched_scores.append(ScoreType.P3)
-        if has_explicit_p1:
+        if cls.P1_REGEX.search(full_text):
             matched_scores.append(ScoreType.P1)
-        if has_explicit_p2:
+        if cls.P2_REGEX.search(full_text):
             matched_scores.append(ScoreType.P2)
 
-        # 2. Örtük (Implicit / Unvan Bazlı) Kontrol
-        if not matched_scores:
-            has_p3_kw = any(kw in full_text for kw in cls.P3_KEYWORDS)
-            has_career_kw = any(kw in full_text for kw in cls.CAREER_P1_P2_KEYWORDS)
-
-            if has_p3_kw:
+        # 2. Örtük (Implicit / Unvan Bazlı) Kontrol: akademik kadro ve işçi ilanları hariç
+        if not matched_scores and not any(p.search(full_text) for p in cls._NON_KPSS_PATTERNS):
+            if any(p.search(full_text) for p in cls._P3_PATTERNS):
                 matched_scores.append(ScoreType.P3)
-            if has_career_kw:
+            if any(p.search(full_text) for p in cls._CAREER_PATTERNS):
                 matched_scores.extend([ScoreType.P1, ScoreType.P2])
 
         # Eğer hiçbiri bulunamadıysa genel kadro

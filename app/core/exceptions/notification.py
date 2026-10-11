@@ -8,6 +8,8 @@ from app.core.exceptions.base import KPSSBaseException
 class NotificationException(KPSSBaseException):
     """Bildirim kanalları genel hatası."""
 
+    http_status = 502
+
     def __init__(
         self,
         message: str,

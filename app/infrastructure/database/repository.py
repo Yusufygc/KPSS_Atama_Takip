@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import aiosqlite
 
 from app.core.logging import get_logger
-from app.domain.models import Announcement, PriorityLevel, ScoreType
+from app.core.text import fold_turkish
+from app.domain.models import Announcement, PriorityLevel, ScoreType, build_search_text
 from app.domain.schemas import AnnouncementFilterParams, SystemStatsResponse
 from app.infrastructure.database.connection import get_db_connection
 
@@ -20,8 +21,8 @@ INSERT OR IGNORE INTO announcements (
     position, city, url, pdf_url, publish_date, deadline_date,
     raw_content, matched_score_types, priority_level,
     field_tags, is_it_field,
-    is_notified, notified_at, created_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    is_notified, notified_at, created_at, search_text
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 """
 
 
@@ -55,11 +56,12 @@ def _insert_params(item: Announcement) -> tuple:
         item.raw_content,
         json.dumps([s.value for s in item.matched_score_types]),
         item.priority_level.value,
-        json.dumps(item.field_tags),
+        json.dumps(item.field_tags, ensure_ascii=False),
         1 if item.is_it_field else 0,
         1 if item.is_notified else 0,
         item.notified_at,
         item.created_at,
+        build_search_text(item.title, item.institution, item.position),
     )
 
 
@@ -68,6 +70,14 @@ class AnnouncementRepository:
 
     def __init__(self, db_path: Optional[Path] = None) -> None:
         self.db_path = db_path
+
+    @staticmethod
+    def _safe_priority(value: Optional[int]) -> PriorityLevel:
+        """Geçersiz/boş öncelik değerlerinde NORMAL seviyeye döner."""
+        try:
+            return PriorityLevel(value)
+        except ValueError:
+            return PriorityLevel.NORMAL
 
     def _row_to_entity(self, row: aiosqlite.Row) -> Announcement:
         """aiosqlite.Row nesnesini Announcement Domain Entity'sine dönüştürür."""
@@ -82,7 +92,13 @@ class AnnouncementRepository:
                 logger.warning(f"Geçersiz matched_score_types değeri yok sayıldı: {exc}")
 
         field_tags_raw = row["field_tags"] if "field_tags" in row.keys() else None
-        field_tags = json.loads(field_tags_raw) if field_tags_raw else []
+        field_tags: List[str] = []
+        if field_tags_raw:
+            try:
+                parsed_tags = json.loads(field_tags_raw)
+                field_tags = [str(t) for t in parsed_tags] if isinstance(parsed_tags, list) else []
+            except ValueError as exc:
+                logger.warning(f"Geçersiz field_tags değeri yok sayıldı: {exc}")
 
         return Announcement(
             id=row["id"],
@@ -99,7 +115,7 @@ class AnnouncementRepository:
             deadline_date=row["deadline_date"],
             raw_content=row["raw_content"],
             matched_score_types=score_types,
-            priority_level=PriorityLevel(row["priority_level"]),
+            priority_level=self._safe_priority(row["priority_level"]),
             field_tags=field_tags,
             is_notified=bool(row["is_notified"]),
             notified_at=row["notified_at"],
@@ -155,12 +171,11 @@ class AnnouncementRepository:
         sql_params: List[Any] = []
 
         if params.search_text:
-            text = f"%{_escape_like(params.search_text.strip())}%"
-            conditions.append(
-                f"(title LIKE ? {LIKE_ESCAPE} OR institution LIKE ? {LIKE_ESCAPE} "
-                f"OR position LIKE ? {LIKE_ESCAPE})"
-            )
-            sql_params.extend([text, text, text])
+            # Türkçe harf duyarsız arama: hem sorgu hem kayıt katlanmış (search_text) biçimde karşılaştırılır
+            folded = fold_turkish(params.search_text)
+            if folded:
+                conditions.append(f"search_text LIKE ? {LIKE_ESCAPE}")
+                sql_params.append(f"%{_escape_like(folded)}%")
 
         if params.source_keys:
             placeholders = ",".join("?" for _ in params.source_keys)
@@ -181,8 +196,9 @@ class AnnouncementRepository:
             conditions.append("(is_it_field = 1 OR (field_tags IS NOT NULL AND field_tags != '[]'))")
 
         if params.field_tag:
+            # Etiket JSON dizisinde tırnaklı tam değer olarak aranır ("Ağ & Sistem" -> kısmi eşleşme yok)
             conditions.append(f"field_tags LIKE ? {LIKE_ESCAPE}")
-            sql_params.append(f"%{_escape_like(params.field_tag.strip())}%")
+            sql_params.append(f"%\"{_escape_like(params.field_tag.strip())}\"%")
 
         if params.city:
             conditions.append("city = ?")

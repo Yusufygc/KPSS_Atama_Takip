@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
 
+from app.core.text import fold_turkish
+
 
 class ScoreType(str, Enum):
     """KPSS puan türleri."""
@@ -33,6 +35,11 @@ def compute_announcement_hash(
     """İlan için deterministik SHA-256 parmak izi üretir (Mükerrer önleme)."""
     raw_payload = f"{source_key.strip().lower()}|{title.strip().lower()}|{url.strip().lower()}|{(deadline_date or '').strip()}"
     return hashlib.sha256(raw_payload.encode("utf-8")).hexdigest()
+
+
+def build_search_text(title: str, institution: str, position: Optional[str] = None) -> str:
+    """Arama için başlık, kurum ve unvanı Türkçe katlanmış tek metne birleştirir."""
+    return fold_turkish(f"{title} {institution} {position or ''}")
 
 
 @dataclass

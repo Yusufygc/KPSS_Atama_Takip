@@ -161,3 +161,21 @@ async def test_document_redirects_only_to_http_urls(client):
 
 async def test_document_unknown_id_is_404(client):
     assert (await client.get("/api/announcements/999/document")).status_code == 404
+
+
+async def test_scheduler_and_api_share_one_service():
+    from app.main import scheduler_service
+
+    assert scheduler_service.service is dependencies._service
+
+
+async def test_server_side_domain_errors_return_5xx_without_leaking_details(client, monkeypatch):
+    from app.core.exceptions.database import DatabaseException
+
+    async def boom(*args, **kwargs):
+        raise DatabaseException("sqlite dosya yolu: C:/gizli/yol.db", details={"path": "C:/gizli/yol.db"})
+
+    monkeypatch.setattr(dependencies._service.repository, "get_system_stats", boom)
+    resp = await client.get("/api/announcements/stats")
+    assert resp.status_code == 500
+    assert "gizli" not in resp.text

@@ -8,6 +8,8 @@ from app.core.exceptions.base import KPSSBaseException
 class ValidationException(KPSSBaseException):
     """Gelen verinin kurallara veya şemaya uymaması hatası."""
 
+    http_status = 422
+
     def __init__(
         self,
         message: str,

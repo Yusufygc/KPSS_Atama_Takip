@@ -39,6 +39,10 @@ Bu doküman, sistemin ilanları kullanıcının KPSS puan profiline göre nasıl
 2. **Unvan / Anahtar Kelime Çıkarımı (Implicit Match):**
    * Eğer puan türü metinde açıkça yazılmamışsa ancak "Mühendis", "Büro Personeli", "Zabıta" gibi lisans unvanları geçiyorsa varsayılan P3 olarak etiketlenir.
    * "Uzman Yardımcısı", "Müfettiş Yardımcısı" gibi kariyer unvanları geçiyorsa P1/P2/P3 ortak potansiyel olarak işaretlenir.
+   * Anahtar kelimeler kelime başında aranır (`4/B` ifadesi `2024/B` içinde eşleşmez); sonek serbesttir (Mühendis -> Mühendisliği).
+   * **Hariç tutulanlar:** Öğretim üyesi/görevlisi, araştırma görevlisi, doçent/profesör gibi akademik kadrolar ile sürekli/geçici işçi alımları örtük olarak P1/P2/P3 sayılmaz (açık `KPSS P3` yazısı varsa yine geçerlidir).
+   * Açık yazım biçimleri: `KPSS P3`, `KPSSP3`, `KPSS-P3`, `KPSS (P3)`, `KPSS P-3`, `P-3`, `P3 puan`.
+   * Kurallar değiştiğinde `SCORING_VERSION` (`connection.py`) artırılır; mevcut kayıtlar açılışta bir kez yeniden puanlanır.
 3. **Kullanıcı Bildirim Filtresi:**
    * Kullanıcı ayarlarından "Sadece P3", "Sadece P1/P2", "Tümü" veya özel anahtar kelimeler seçilebilir.
    * Varsayılan mod: P3, P1 ve P2 ile uyumlu tüm ilanlar anında Telegram'a bildirilir.

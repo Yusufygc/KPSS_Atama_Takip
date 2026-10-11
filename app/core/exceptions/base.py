@@ -6,6 +6,9 @@ from typing import Any, Dict, Optional
 class KPSSBaseException(Exception):
     """Tüm uygulama içi özel istisnaların atası olan temel sınıf."""
 
+    # HTTP durum kodu: istemci hatası (4xx) ile sunucu/altyapı hatasını (5xx) ayırır
+    http_status: int = 500
+
     def __init__(
         self,
         message: str,

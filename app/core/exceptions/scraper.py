@@ -8,6 +8,8 @@ from app.core.exceptions.base import KPSSBaseException
 class ScraperException(KPSSBaseException):
     """Kazıyıcı işlemlerinde meydana gelen genel hata."""
 
+    http_status = 502
+
     def __init__(
         self,
         message: str,
@@ -76,6 +78,8 @@ class RateLimitScraperException(ScraperException):
 
 class ScrapeInProgressException(KPSSBaseException):
     """Bir tarama döngüsü zaten çalışırken yenisi başlatılmaya çalışıldığında fırlatılır."""
+
+    http_status = 409
 
     def __init__(self, message: str) -> None:
         super().__init__(message=message, error_code="SCRAPE_IN_PROGRESS")

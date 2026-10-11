@@ -8,6 +8,8 @@ from app.core.exceptions.base import KPSSBaseException
 class DatabaseException(KPSSBaseException):
     """Veritabanı erişimi veya işlem hataları."""
 
+    http_status = 500
+
     def __init__(
         self,
         message: str,

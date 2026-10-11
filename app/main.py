@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.dependencies import get_announcement_service
 from app.api.routes import announcements_router, scrapers_router, settings_router
 from app.config import settings
 from app.core.constants.settings import SecurityConstants
@@ -21,7 +22,8 @@ setup_root_logger()
 logger = get_logger("main")
 
 # Arka plan zamanlayıcı örneği
-scheduler_service = SchedulerService()
+# API ile aynı servis örneği paylaşılır: tarama kilidi ve portal durumları tek yerde tutulur
+scheduler_service = SchedulerService(get_announcement_service())
 
 
 @asynccontextmanager
@@ -85,10 +87,12 @@ def create_app() -> FastAPI:
     @app.exception_handler(KPSSBaseException)
     async def kpss_exception_handler(request: Request, exc: KPSSBaseException):
         logger.error(f"Uygulama Hatası [{exc.error_code}]: {exc.message}")
-        return JSONResponse(
-            status_code=400,
-            content=exc.to_dict(),
-        )
+        if exc.http_status >= 500:
+            # Sunucu tarafı hata ayrıntıları (yol, SQL vb.) istemciye sızdırılmaz
+            content = {"error_code": exc.error_code, "message": "Sunucu hatası oluştu."}
+        else:
+            content = exc.to_dict()
+        return JSONResponse(status_code=exc.http_status, content=content)
 
     # API Rotalarını Ekle
     app.include_router(announcements_router, prefix="/api")

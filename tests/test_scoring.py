@@ -72,3 +72,44 @@ def test_it_matcher_lowercase_title():
 )
 def test_city_matcher(title, institution, expected):
     assert CityMatcher.detect_city(title=title, institution=institution) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Adaylarda KPSS-P3 puanı aranır",
+        "KPSS (P3) puan türünden en az 70",
+        "KPSS P-3 puanı",
+        "kpss p3 puan türü",
+        "P3 puan türü ile",
+    ],
+)
+def test_explicit_p3_spellings(text):
+    scores, _ = KPSSScoreMatcher.match(title="Duyuru", raw_content=text)
+    assert scores == [ScoreType.P3]
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Mühendislik Fakültesi öğretim üyesi alımı",
+        "Mimarlık Fakültesi Doç. Dr. alımı",
+        "Üniversite Doktor Öğretim Üyesi alım ilanı",
+        "Belediye sürekli işçi alımı (şoför)",
+        "2024/B sınıfı duyuru",  # "4/B" kalıbı sayının içinde eşleşmemeli
+    ],
+)
+def test_implicit_match_skips_academic_labour_and_embedded_numbers(title):
+    scores, priority = KPSSScoreMatcher.match(title=title)
+    assert scores == [ScoreType.GENERAL]
+    assert priority == PriorityLevel.NORMAL
+
+
+@pytest.mark.parametrize("title", ["4/B sözleşmeli alım", "4-B Sözleşmeli", "Belediye 4 / B Sözleşmeli personel"])
+def test_4b_pattern_still_matches(title):
+    assert KPSSScoreMatcher.match(title=title)[0] == [ScoreType.P3]
+
+
+def test_explicit_score_wins_even_for_academic_wording():
+    scores, _ = KPSSScoreMatcher.match(title="Öğretim görevlisi alımı", raw_content="KPSS P3 en az 60")
+    assert scores == [ScoreType.P3]
