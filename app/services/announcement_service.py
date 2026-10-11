@@ -1,7 +1,8 @@
 """KPSS Atama Takip - İlan İş Mantığı ve Orkestrasyon Servisi."""
 
 import asyncio
-from typing import List, Optional, Tuple
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.config import settings
 from app.core.constants.settings import TelegramConstants
@@ -44,11 +45,34 @@ class AnnouncementService:
         self.orchestrator = orchestrator or ScraperOrchestrator()
         self.notifier = notifier or TelegramNotifier()
         self._cycle_lock = asyncio.Lock()
+        self._background_task: Optional["asyncio.Task[None]"] = None
+        # Son tamamlanan (veya hata veren) döngünün özeti; arayüz durum sorgusu için
+        self.last_cycle: Optional[Dict[str, Any]] = None
 
     @property
     def is_scraping(self) -> bool:
-        """Bir tarama döngüsünün çalışıp çalışmadığını döner."""
-        return self._cycle_lock.locked()
+        """Bir tarama döngüsünün çalışıp çalışmadığını (başlatılmak üzere olanlar dahil) döner."""
+        task_pending = self._background_task is not None and not self._background_task.done()
+        return self._cycle_lock.locked() or task_pending
+
+    def start_background_cycle(self) -> None:
+        """Tarama döngüsünü arka planda başlatır; HTTP isteğini taramanın bitmesine kadar bekletmez."""
+        if self.is_scraping:
+            raise ScrapeInProgressException(ErrorStrings.SCRAPE_ALREADY_RUNNING)
+        self._background_task = asyncio.create_task(self._run_background_cycle())
+
+    async def _run_background_cycle(self) -> None:
+        try:
+            await self.run_full_cycle()
+        except Exception as exc:  # noqa: BLE001 - arka plan görevi hata yüzünden sessizce ölmemeli
+            logger.error(f"Arka plan taraması başarısız: {exc}")
+
+    async def shutdown(self) -> None:
+        """Uygulama kapanırken çalışan arka plan taramasını iptal eder."""
+        task = self._background_task
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
     async def run_full_cycle(self) -> Tuple[int, List[ScraperRunStatus]]:
         """Tüm portalları tarar, puan eşleştirmesi yapar, yeni olanları kaydeder ve bildirir.
@@ -58,7 +82,21 @@ class AnnouncementService:
         if self._cycle_lock.locked():
             raise ScrapeInProgressException(ErrorStrings.SCRAPE_ALREADY_RUNNING)
         async with self._cycle_lock:
-            return await self._run_full_cycle_locked()
+            try:
+                new_count, statuses = await self._run_full_cycle_locked()
+            except Exception as exc:
+                self.last_cycle = {
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                    "new_announcements": 0,
+                    "error": str(exc)[:200] or type(exc).__name__,
+                }
+                raise
+            self.last_cycle = {
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "new_announcements": new_count,
+                "error": None,
+            }
+            return new_count, statuses
 
     def _build_entity(self, dto: AnnouncementCreate) -> Announcement:
         """Ham DTO'yu puan, bilişim etiketi ve şehir tespitiyle zenginleştirilmiş varlığa çevirir."""

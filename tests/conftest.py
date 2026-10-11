@@ -35,7 +35,36 @@ def isolated_settings(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "APP_ENV", "test")
     monkeypatch.setattr(settings, "API_KEY", "")
     monkeypatch.setattr(settings, "TELEGRAM_NOTIFICATIONS_ENABLED", False)
+    monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "")
+    monkeypatch.setattr(settings, "TELEGRAM_CHAT_ID", "")
+
+    # api.dependencies içindeki paylaşılan bildirici içe aktarma anında .env değerleriyle üretilir;
+    # testlerin gerçek Telegram hesabına mesaj atmaması için bu örnek de etkisizleştirilir.
+    from app.api import dependencies
+
+    monkeypatch.setattr(dependencies._notifier, "bot_token", "")
+    monkeypatch.setattr(dependencies._notifier, "chat_id", "")
+    monkeypatch.setattr(dependencies._notifier, "is_enabled", False)
     return settings
+
+
+@pytest.fixture(autouse=True)
+def forbid_real_network(request, monkeypatch):
+    """Testlerin gerçek ağ isteği atmasını engeller (sahte/ASGI transport'lar serbest).
+
+    Canlı portal testleri `@pytest.mark.live` ile bu korumadan muaf tutulur.
+    """
+    if "live" in request.keywords:
+        return
+
+    real_send = httpx.AsyncClient.send
+
+    async def guarded_send(self, request_obj, *args, **kwargs):
+        if isinstance(self._transport, httpx.AsyncHTTPTransport):
+            raise RuntimeError(f"Testte gerçek ağ isteği yasak: {request_obj.method} {request_obj.url}")
+        return await real_send(self, request_obj, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.AsyncClient, "send", guarded_send)
 
 
 @pytest.fixture

@@ -61,3 +61,18 @@ def test_logging(isolated_settings):
     get_logger("unit_test").info("Test log mesajı: Kök logger çalışıyor.")
     get_scraper_logger("KariyerKapisi").info("Test log mesajı: 24 ilan çekildi.")
     assert (settings.LOGS_DIR / "app.log").exists()
+
+
+async def test_real_network_is_blocked_in_tests():
+    import httpx
+    import pytest
+
+    with pytest.raises(RuntimeError, match="gerçek ağ isteği yasak"):
+        async with httpx.AsyncClient() as http:
+            await http.get("https://api.telegram.org/")
+
+
+def test_shared_notifier_is_neutralised_in_tests():
+    from app.api import dependencies
+
+    assert dependencies._notifier.is_ready is False

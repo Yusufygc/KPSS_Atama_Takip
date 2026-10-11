@@ -96,13 +96,61 @@ async def test_concurrent_scrape_returns_409(client, monkeypatch):
 
     monkeypatch.setattr(dependencies._service.orchestrator, "run_all", slow_run_all)
 
-    first = asyncio.create_task(client.post("/api/scrapers/run"))
+    first = asyncio.create_task(client.post("/api/scrapers/run?wait=true"))
     await asyncio.sleep(0.05)
-    second = await client.post("/api/scrapers/run")
-    assert second.status_code == 409
+    assert (await client.post("/api/scrapers/run")).status_code == 409
+    assert (await client.post("/api/scrapers/run?wait=true")).status_code == 409
 
     release.set()
     assert (await first).status_code == 200
+
+
+async def test_scrape_starts_in_background_and_reports_status(client, monkeypatch):
+    release = asyncio.Event()
+
+    async def slow_run_all():
+        await release.wait()
+        return []
+
+    monkeypatch.setattr(dependencies._service.orchestrator, "run_all", slow_run_all)
+
+    started = await client.post("/api/scrapers/run")
+    assert started.status_code == 202 and started.json()["started"] is True
+
+    running = (await client.get("/api/scrapers/run/status")).json()
+    assert running["running"] is True
+    assert (await client.post("/api/scrapers/run")).status_code == 409, "Başlatılmak üzereyken de ikinci istek reddedilmeli"
+
+    release.set()
+    for _ in range(50):
+        status = (await client.get("/api/scrapers/run/status")).json()
+        if not status["running"]:
+            break
+        await asyncio.sleep(0.02)
+    assert status["running"] is False
+    assert status["last_cycle"]["error"] is None and status["last_cycle"]["new_announcements"] == 0
+
+
+async def test_background_scrape_failure_is_reported_not_raised(client, monkeypatch):
+    async def broken_run_all():
+        raise RuntimeError("portal çöktü")
+
+    monkeypatch.setattr(dependencies._service.orchestrator, "run_all", broken_run_all)
+
+    assert (await client.post("/api/scrapers/run")).status_code == 202
+    for _ in range(50):
+        status = (await client.get("/api/scrapers/run/status")).json()
+        if not status["running"]:
+            break
+        await asyncio.sleep(0.02)
+    assert status["last_cycle"]["error"] == "portal çöktü"
+
+    # Hatadan sonra yeni tarama başlatılabilmeli (orkestratör bu kez boş sonuç döner)
+    async def empty_run_all():
+        return []
+
+    monkeypatch.setattr(dependencies._service.orchestrator, "run_all", empty_run_all)
+    assert (await client.post("/api/scrapers/run?wait=true")).status_code == 200
 
 
 # --- Belge proxy (SSRF) ----------------------------------------------------------

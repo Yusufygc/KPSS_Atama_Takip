@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
     # 3. Kapanırken kaynakları temizle
     logger.info("Uygulama kapatılıyor...")
     scheduler_service.stop()
+    await get_announcement_service().shutdown()
 
 
 def create_app() -> FastAPI:
