@@ -5,15 +5,16 @@ import time
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple
 
+# Adaptörlerin kayıt defterine yüklenmesini garanti et
+import app.scrapers.adapters  # noqa: F401
+from app.config import settings
 from app.core.constants.icons import PortalIcons
+from app.core.constants.settings import ScraperLimits
 from app.core.constants.strings import MessageStrings
 from app.core.logging import get_logger
 from app.domain.schemas import AnnouncementCreate, ScraperRunStatus
 from app.scrapers.base import BaseScraper
 from app.scrapers.registry import ScraperRegistry
-
-# Adaptörlerin kayıt defterine yüklenmesini garanti et
-import app.scrapers.adapters  # noqa: F401
 
 logger = get_logger("scrapers.orchestrator")
 
@@ -45,7 +46,9 @@ class ScraperOrchestrator:
         )
 
         try:
-            items = await scraper.scrape()
+            items = await asyncio.wait_for(
+                scraper.scrape(), timeout=ScraperLimits.SCRAPER_JOB_TIMEOUT_SECONDS
+            )
             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
             status.status = "success"
@@ -69,7 +72,7 @@ class ScraperOrchestrator:
                 MessageStrings.SCRAPER_FAILED.format(portal=portal_name, error=str(e))
             )
             status.status = "error"
-            status.error_message = str(e)
+            status.error_message = str(e) or type(e).__name__
             status.duration_ms = duration_ms
             self._last_statuses[portal_key] = status
             return portal_key, [], status
@@ -79,8 +82,13 @@ class ScraperOrchestrator:
         scrapers = ScraperRegistry.get_all()
         logger.info(f"Eşzamanlı tarama başlatılıyor. Kayıtlı portal sayısı: {len(scrapers)}")
 
-        tasks = [self._execute_single_safe(s) for s in scrapers]
-        results = await asyncio.gather(*tasks)
+        semaphore = asyncio.Semaphore(max(1, settings.SCRAPER_CONCURRENT_WORKERS))
+
+        async def _bounded(scraper: BaseScraper):
+            async with semaphore:
+                return await self._execute_single_safe(scraper)
+
+        results = await asyncio.gather(*(_bounded(s) for s in scrapers))
         return list(results)
 
     async def run_single(

@@ -1,10 +1,12 @@
 """KPSS Atama Takip - Arka Plan Zamanlayıcı Servisi (APScheduler)."""
 
 from typing import Optional
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import settings
+from app.core.exceptions.scraper import ScrapeInProgressException
 from app.core.logging import get_logger
 from app.services.announcement_service import AnnouncementService
 
@@ -25,6 +27,8 @@ class SchedulerService:
         try:
             new_count, statuses = await self.service.run_full_cycle()
             logger.info(f"Zamanlanmış tarama tamamlandı. Yeni ilan: {new_count}")
+        except ScrapeInProgressException:
+            logger.info("Önceki tarama hâlâ sürüyor, bu tetikleme atlandı.")
         except Exception as e:
             logger.error(f"Zamanlanmış tarama sırasında hata: {e}")
 
@@ -38,6 +42,8 @@ class SchedulerService:
             self._scheduled_task,
             trigger=IntervalTrigger(minutes=interval_minutes),
             id="periodic_scraper_job",
+            max_instances=1,
+            coalesce=True,
             name="Periyodik KPSS İlan Taraması",
             replace_existing=True,
         )

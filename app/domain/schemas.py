@@ -1,6 +1,7 @@
 """KPSS Atama Takip - Pydantic Veri Transfer Nesneleri (DTO / Schemas)."""
 
 from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 from app.core.constants.icons import PortalIcons, ScoreIcons

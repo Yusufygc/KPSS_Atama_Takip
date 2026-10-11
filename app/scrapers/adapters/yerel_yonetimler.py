@@ -2,6 +2,7 @@
 
 import re
 from typing import List
+
 from bs4 import BeautifulSoup
 
 from app.core.constants.strings import PortalKeys, PortalStrings

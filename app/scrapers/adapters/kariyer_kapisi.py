@@ -1,6 +1,7 @@
 """KPSS Atama Takip - Kariyer Kapısı (CBİKO) Kazıyıcı Adaptörü."""
 
 from typing import List
+
 from app.core.constants.strings import PortalKeys, PortalStrings
 from app.core.exceptions.scraper import ParsingScraperException
 from app.domain.schemas import AnnouncementCreate

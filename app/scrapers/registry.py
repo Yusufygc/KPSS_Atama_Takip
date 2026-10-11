@@ -1,6 +1,7 @@
 """KPSS Atama Takip - Kazıyıcı Kayıt Defteri (Factory / Registry Pattern)."""
 
 from typing import Dict, List, Type
+
 from app.core.exceptions.scraper import ScraperException
 from app.core.logging import get_logger
 from app.scrapers.base import BaseScraper

@@ -1,9 +1,9 @@
 """KPSS Atama Takip - Asenkron SQLite Bağlantı ve Şema Yönetimi."""
 
-import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator, Optional
+
 import aiosqlite
 
 from app.config import settings

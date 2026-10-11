@@ -4,15 +4,63 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
 import aiosqlite
 
-from app.core.exceptions.database import DatabaseException
 from app.core.logging import get_logger
 from app.domain.models import Announcement, PriorityLevel, ScoreType
 from app.domain.schemas import AnnouncementFilterParams, SystemStatsResponse
 from app.infrastructure.database.connection import get_db_connection
 
 logger = get_logger("database.repository")
+
+INSERT_SQL = """
+INSERT OR IGNORE INTO announcements (
+    hash_id, source_key, source_name, title, institution,
+    position, city, url, pdf_url, publish_date, deadline_date,
+    raw_content, matched_score_types, priority_level,
+    field_tags, is_it_field,
+    is_notified, notified_at, created_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+"""
+
+
+LIKE_ESCAPE = "ESCAPE '" + chr(92) + "'"
+
+
+def _escape_like(value: str) -> str:
+    """LIKE sorgusunda özel anlam taşıyan %, _ ve ters eğik çizgiyi kaçışlar (ESCAPE ters eğik çizgi)."""
+    escape_char = chr(92)
+    return (
+        value.replace(escape_char, escape_char * 2)
+        .replace("%", escape_char + "%")
+        .replace("_", escape_char + "_")
+    )
+
+
+def _insert_params(item: Announcement) -> tuple:
+    """Announcement varlığını INSERT_SQL parametre sırasına çevirir."""
+    return (
+        item.hash_id,
+        item.source_key,
+        item.source_name,
+        item.title,
+        item.institution,
+        item.position,
+        item.city,
+        item.url,
+        item.pdf_url,
+        item.publish_date,
+        item.deadline_date,
+        item.raw_content,
+        json.dumps([s.value for s in item.matched_score_types]),
+        item.priority_level.value,
+        json.dumps(item.field_tags),
+        1 if item.is_it_field else 0,
+        1 if item.is_notified else 0,
+        item.notified_at,
+        item.created_at,
+    )
 
 
 class AnnouncementRepository:
@@ -30,8 +78,8 @@ class AnnouncementRepository:
             try:
                 parsed = json.loads(score_types_raw)
                 score_types = [ScoreType(s) for s in parsed if s in ScoreType._value2member_map_]
-            except Exception:
-                pass
+            except (ValueError, TypeError) as exc:
+                logger.warning(f"Geçersiz matched_score_types değeri yok sayıldı: {exc}")
 
         field_tags_raw = row["field_tags"] if "field_tags" in row.keys() else None
         field_tags = json.loads(field_tags_raw) if field_tags_raw else []
@@ -68,44 +116,8 @@ class AnnouncementRepository:
 
     async def save(self, item: Announcement) -> Optional[int]:
         """Yeni bir ilanı kaydeder. İlan zaten varsa None döner (Mükerrer koruması)."""
-        score_types_json = json.dumps([s.value for s in item.matched_score_types])
-        field_tags_json = json.dumps(item.field_tags)
-        is_it_val = 1 if item.is_it_field else 0
-
-        sql = """
-        INSERT OR IGNORE INTO announcements (
-            hash_id, source_key, source_name, title, institution,
-            position, city, url, pdf_url, publish_date, deadline_date,
-            raw_content, matched_score_types, priority_level,
-            field_tags, is_it_field,
-            is_notified, notified_at, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """
         async with get_db_connection(self.db_path) as conn:
-            cursor = await conn.execute(
-                sql,
-                (
-                    item.hash_id,
-                    item.source_key,
-                    item.source_name,
-                    item.title,
-                    item.institution,
-                    item.position,
-                    item.city,
-                    item.url,
-                    item.pdf_url,
-                    item.publish_date,
-                    item.deadline_date,
-                    item.raw_content,
-                    score_types_json,
-                    item.priority_level.value,
-                    field_tags_json,
-                    is_it_val,
-                    1 if item.is_notified else 0,
-                    item.notified_at,
-                    item.created_at,
-                ),
-            )
+            cursor = await conn.execute(INSERT_SQL, _insert_params(item))
             await conn.commit()
             if cursor.rowcount > 0:
                 item.id = cursor.lastrowid
@@ -120,43 +132,7 @@ class AnnouncementRepository:
         inserted_count = 0
         async with get_db_connection(self.db_path) as conn:
             for item in items:
-                score_types_json = json.dumps([s.value for s in item.matched_score_types])
-                field_tags_json = json.dumps(item.field_tags)
-                is_it_val = 1 if item.is_it_field else 0
-
-                sql = """
-                INSERT OR IGNORE INTO announcements (
-                    hash_id, source_key, source_name, title, institution,
-                    position, city, url, pdf_url, publish_date, deadline_date,
-                    raw_content, matched_score_types, priority_level,
-                    field_tags, is_it_field,
-                    is_notified, notified_at, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-                """
-                cursor = await conn.execute(
-                    sql,
-                    (
-                        item.hash_id,
-                        item.source_key,
-                        item.source_name,
-                        item.title,
-                        item.institution,
-                        item.position,
-                        item.city,
-                        item.url,
-                        item.pdf_url,
-                        item.publish_date,
-                        item.deadline_date,
-                        item.raw_content,
-                        score_types_json,
-                        item.priority_level.value,
-                        field_tags_json,
-                        is_it_val,
-                        1 if item.is_notified else 0,
-                        item.notified_at,
-                        item.created_at,
-                    ),
-                )
+                cursor = await conn.execute(INSERT_SQL, _insert_params(item))
                 if cursor.rowcount > 0:
                     inserted_count += 1
             await conn.commit()
@@ -179,8 +155,11 @@ class AnnouncementRepository:
         sql_params: List[Any] = []
 
         if params.search_text:
-            text = f"%{params.search_text.strip()}%"
-            conditions.append("(title LIKE ? OR institution LIKE ? OR position LIKE ?)")
+            text = f"%{_escape_like(params.search_text.strip())}%"
+            conditions.append(
+                f"(title LIKE ? {LIKE_ESCAPE} OR institution LIKE ? {LIKE_ESCAPE} "
+                f"OR position LIKE ? {LIKE_ESCAPE})"
+            )
             sql_params.extend([text, text, text])
 
         if params.source_keys:
@@ -202,8 +181,8 @@ class AnnouncementRepository:
             conditions.append("(is_it_field = 1 OR (field_tags IS NOT NULL AND field_tags != '[]'))")
 
         if params.field_tag:
-            conditions.append("field_tags LIKE ?")
-            sql_params.append(f"%{params.field_tag.strip()}%")
+            conditions.append(f"field_tags LIKE ? {LIKE_ESCAPE}")
+            sql_params.append(f"%{_escape_like(params.field_tag.strip())}%")
 
         if params.city:
             conditions.append("city = ?")
@@ -212,15 +191,14 @@ class AnnouncementRepository:
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         # Toplam eşleşme sayısı sorgusu
-        count_sql = f"SELECT COUNT(*) FROM announcements {where_clause};"
+        # where_clause yalnızca sabit koşul ve ? yer tutucularından oluşur; kullanıcı girdisi parametre olarak geçer
+        count_sql = f"SELECT COUNT(*) FROM announcements {where_clause};"  # noqa: S608  # nosec B608
 
         # Sayfalanmış veri sorgusu (Öncelikli P3 en üstte, ardından son tarihe göre)
-        data_sql = f"""
-        SELECT * FROM announcements
-        {where_clause}
-        ORDER BY priority_level DESC, id DESC
-        LIMIT ? OFFSET ?;
-        """
+        data_sql = (
+            f"SELECT * FROM announcements {where_clause} "  # noqa: S608  # nosec B608
+            "ORDER BY priority_level DESC, id DESC LIMIT ? OFFSET ?;"
+        )
 
         async with get_db_connection(self.db_path) as conn:
             # Toplam sayı
@@ -256,11 +234,10 @@ class AnnouncementRepository:
 
         now_iso = datetime.now(timezone.utc).isoformat()
         placeholders = ",".join("?" for _ in ids)
-        sql = f"""
-        UPDATE announcements
-        SET is_notified = 1, notified_at = ?
-        WHERE id IN ({placeholders});
-        """
+        sql = (
+            "UPDATE announcements SET is_notified = 1, notified_at = ? "  # noqa: S608  # nosec B608
+            f"WHERE id IN ({placeholders});"
+        )
         params = [now_iso] + ids
 
         async with get_db_connection(self.db_path) as conn:
@@ -290,6 +267,13 @@ class AnnouncementRepository:
             ) as cursor:
                 p1_p2_count = (await cursor.fetchone())[0] or 0
 
+            # Hiçbir KPSS puan türüyle eşleşmeyen (genel) ilanlar
+            async with conn.execute(
+                "SELECT COUNT(*) FROM announcements WHERE matched_score_types NOT LIKE '%P1%' "
+                "AND matched_score_types NOT LIKE '%P2%' AND matched_score_types NOT LIKE '%P3%';"
+            ) as cursor:
+                general_count = (await cursor.fetchone())[0] or 0
+
             # Bilişim / Bilgisayar alanı sayısı
             async with conn.execute(
                 "SELECT COUNT(*) FROM announcements WHERE is_it_field = 1 OR (field_tags IS NOT NULL AND field_tags != '[]');"
@@ -305,14 +289,12 @@ class AnnouncementRepository:
                 for r in rows:
                     by_source[r[0]] = r[1]
 
-        general_count = total - (p3_count + p1_p2_count)
-
         return SystemStatsResponse(
             total_announcements=total,
             total_unnotified=unnotified,
             p3_count=p3_count,
             p1_p2_count=p1_p2_count,
-            general_count=max(0, general_count),
+            general_count=general_count,
             it_count=it_count,
             by_source=by_source,
         )

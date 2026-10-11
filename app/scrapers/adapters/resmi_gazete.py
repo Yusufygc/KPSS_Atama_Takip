@@ -1,7 +1,9 @@
 """KPSS Atama Takip - T.C. Resmî Gazete Kazıyıcı Adaptörü."""
 
+import re
 from datetime import datetime, timedelta, timezone
 from typing import List
+
 from bs4 import BeautifulSoup
 
 from app.core.constants.strings import PortalKeys, PortalStrings
@@ -17,11 +19,15 @@ class ResmiGazeteScraper(BaseScraper):
     portal_key = PortalKeys.RESMI_GAZETE
     portal_name = PortalStrings.RESMI_GAZETE
     BASE_URL = "https://www.resmigazete.gov.tr"
+    # Bölüm 4 ilan dosyaları: 20261010-4-12.pdf gibi (gezinti/menü bağlantılarını dışarıda bırakır)
+    ANNOUNCEMENT_LINK_RE = re.compile(r"\d{8}-4-\d+\.pdf$", re.IGNORECASE)
+    # Türkiye'de yaz/kış saati uygulaması yoktur (sabit UTC+3)
+    TURKEY_TZ = timezone(timedelta(hours=3))
 
     async def scrape(self) -> List[AnnouncementCreate]:
         self.logger.info("Resmî Gazete güncel ve geçmiş son 3 günün ilanları taranıyor...")
         announcements: List[AnnouncementCreate] = []
-        today = datetime.now(timezone.utc)
+        today = datetime.now(self.TURKEY_TZ)
 
         # Son 3 günü tara (Hafta sonu veya dün yayınlananları kaçırmamak için)
         for days_back in range(3):
@@ -46,6 +52,8 @@ class ResmiGazeteScraper(BaseScraper):
 
                     # İlan başlığı ve PDF linki kontrolü
                     if not text or len(text) < 5:
+                        continue
+                    if not self.ANNOUNCEMENT_LINK_RE.search(href):
                         continue
 
                     # PDF linkini mutlak adrese çevir
