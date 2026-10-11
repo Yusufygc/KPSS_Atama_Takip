@@ -254,3 +254,31 @@ async def test_telegram_truncates_long_messages(telegram_http):
 
     text = json.loads(state["requests"][0].read())["text"]
     assert len(text) == 4096
+
+
+async def test_expired_items_are_marked_notified_without_sending(build):
+    from app.core.dates import today_in_turkey
+
+    notifier = FakeNotifier()
+    service, orchestrator = build(notifier)
+    await seed(service)
+    yesterday = (today_in_turkey() - timedelta(days=1)).strftime("%d.%m.%Y")
+    tomorrow = (today_in_turkey() + timedelta(days=1)).strftime("%d.%m.%Y")
+    expired = dto("Süresi dolmuş")
+    expired.deadline_date = yesterday
+    active = dto("Süresi var")
+    active.deadline_date = tomorrow
+    orchestrator.dtos = [expired, active]
+
+    await service.run_full_cycle()
+
+    assert notifier.sent_titles == ["Süresi var"]
+    assert await unnotified_count(service) == 0
+
+
+def test_telegram_message_shows_normalized_deadline():
+    item = Announcement(
+        source_key="x", source_name="K", title="T", institution="I", url="https://a.test",
+        deadline_date="12 Ekim - 26 Ekim", created_at="2026-10-12T08:00:00+00:00",
+    )
+    assert "26.10.2026" in TelegramNotifier(bot_token="1:a", chat_id="1", is_enabled=True)._format_announcement_message(item)

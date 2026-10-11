@@ -53,6 +53,14 @@ class TelegramNotifier(BaseNotifier):
         value = str(text)
         return value.replace(self.bot_token, "***") if self.bot_token else value
 
+    @staticmethod
+    def _format_deadline(item: Announcement) -> str:
+        """Normalize tarih varsa GG.AA.YYYY, yoksa kaynaktaki ham metni döner."""
+        if item.deadline_on:
+            year, month, day = item.deadline_on.split("-")
+            return f"{day}.{month}.{year}"
+        return item.deadline_date or ""
+
     def _format_announcement_message(self, item: Announcement) -> str:
         """İlan için zengin HTML Telegram mesaj metni üretir."""
         # Puan türü formatlama
@@ -72,8 +80,9 @@ class TelegramNotifier(BaseNotifier):
             NotificationStrings.SCORE_TYPE.format(score_type=score_badge),
         ]
 
-        if item.deadline_date:
-            lines.append(NotificationStrings.DEADLINE.format(deadline=escape_html(item.deadline_date)))
+        deadline_text = self._format_deadline(item)
+        if deadline_text:
+            lines.append(NotificationStrings.DEADLINE.format(deadline=escape_html(deadline_text)))
 
         portal_icon = PortalIcons.get_for_portal(item.source_key)
         lines.append(

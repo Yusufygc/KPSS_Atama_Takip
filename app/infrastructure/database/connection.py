@@ -9,6 +9,7 @@ from typing import AsyncGenerator, Optional
 import aiosqlite
 
 from app.config import settings
+from app.core.dates import day_of_timestamp, parse_deadline_iso
 from app.core.exceptions.database import DatabaseException, QueryExecutionException
 from app.core.logging import get_logger
 from app.core.scoring.strategy import KPSSScoreMatcher
@@ -33,6 +34,7 @@ CREATE TABLE IF NOT EXISTS announcements (
     pdf_url TEXT,
     publish_date TEXT,
     deadline_date TEXT,
+    deadline_on TEXT,              -- normalize son başvuru günü (YYYY-MM-DD)
     raw_content TEXT,
     matched_score_types TEXT,      -- JSON dizisi: '["P3"]'
     priority_level INTEGER DEFAULT 1,
@@ -133,6 +135,26 @@ async def _backfill_search_text(conn: aiosqlite.Connection) -> None:
         )
     if rows:
         logger.info(f"{len(rows)} kaydın arama metni oluşturuldu.")
+
+
+async def _backfill_deadline_on(conn: aiosqlite.Connection) -> None:
+    """deadline_on boş olan kayıtlar için serbest metin tarihi normalize eder.
+
+    Yılsız tarihler kaydın oluşturulma gününe göre yorumlanır (eski kayıtlar bugüne göre değil).
+    """
+    async with conn.execute(
+        "SELECT id, deadline_date, created_at FROM announcements "
+        "WHERE deadline_on IS NULL AND deadline_date IS NOT NULL AND deadline_date != '';"
+    ) as cursor:
+        rows = await cursor.fetchall()
+    updated = 0
+    for row in rows:
+        iso = parse_deadline_iso(row["deadline_date"], day_of_timestamp(row["created_at"]))
+        if iso:
+            await conn.execute("UPDATE announcements SET deadline_on = ? WHERE id = ?;", (iso, row["id"]))
+            updated += 1
+    if updated:
+        logger.info(f"{updated} kaydın son başvuru tarihi normalize edildi.")
 
 
 async def _normalize_field_tags_encoding(conn: aiosqlite.Connection) -> None:
@@ -244,12 +266,16 @@ async def init_database(custom_path: Optional[Path] = None) -> None:
                 await conn.execute("ALTER TABLE announcements ADD COLUMN field_tags TEXT;")
             if "is_it_field" not in existing_cols:
                 await conn.execute("ALTER TABLE announcements ADD COLUMN is_it_field INTEGER DEFAULT 0;")
+            if "deadline_on" not in existing_cols:
+                await conn.execute("ALTER TABLE announcements ADD COLUMN deadline_on TEXT;")
             if "search_text" not in existing_cols:
                 await conn.execute("ALTER TABLE announcements ADD COLUMN search_text TEXT;")
 
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_announcements_it ON announcements(is_it_field);")
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_announcements_deadline_on ON announcements(deadline_on);")
         await _fix_legacy_kariyer_kapisi_urls(conn)
         await _backfill_search_text(conn)
+        await _backfill_deadline_on(conn)
         await _normalize_field_tags_encoding(conn)
         await _remove_legacy_iskur_rows(conn)
         await _rehash_unstable_url_sources(conn)

@@ -5,6 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from app.core.constants.icons import PortalIcons, ScoreIcons
+from app.core.dates import today_in_turkey
 from app.domain.models import PriorityLevel, ScoreType
 
 
@@ -43,6 +44,8 @@ class AnnouncementResponse(BaseModel):
     document_url: Optional[str] = None
     publish_date: Optional[str] = None
     deadline_date: Optional[str] = None
+    deadline_on: Optional[str] = None
+    is_expired: bool = False
     matched_score_types: List[ScoreType] = []
     priority_level: PriorityLevel = PriorityLevel.NORMAL
     priority_icon: str = Field(default="")
@@ -87,6 +90,8 @@ class AnnouncementResponse(BaseModel):
             document_url=doc_url,
             publish_date=entity.publish_date,
             deadline_date=entity.deadline_date,
+            deadline_on=entity.deadline_on,
+            is_expired=bool(entity.deadline_on and entity.deadline_on < today_in_turkey().isoformat()),
             matched_score_types=entity.matched_score_types,
             priority_level=entity.priority_level,
             priority_icon=p_icon,
@@ -106,6 +111,7 @@ class AnnouncementFilterParams(BaseModel):
     search_text: Optional[str] = None
     city: Optional[str] = None
     only_unnotified: bool = False
+    only_active: bool = False
     only_p3: bool = False
     only_it: bool = False
     field_tag: Optional[str] = None

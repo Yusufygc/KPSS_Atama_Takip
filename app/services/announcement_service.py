@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 from app.config import settings
 from app.core.constants.settings import TelegramConstants
 from app.core.constants.strings import ErrorStrings, MessageStrings, NotificationStrings
+from app.core.dates import today_in_turkey
 from app.core.exceptions.scraper import ScrapeInProgressException
 from app.core.logging import get_logger
 from app.core.scoring.city_matcher import CityMatcher
@@ -164,6 +165,15 @@ class AnnouncementService:
         if not pending:
             return
 
+        # Son başvuru günü geçmiş ilanlar için bildirim anlamsızdır: sessizce "bildirildi" işaretlenir
+        today_iso = today_in_turkey().isoformat()
+        expired = [i for i in pending if i.deadline_on and i.deadline_on < today_iso]
+        if expired:
+            await self.repository.mark_as_notified([i.id for i in expired])
+            pending = [i for i in pending if i not in expired]
+            if not pending:
+                return
+
         if is_first_run and not settings.NOTIFY_ON_FIRST_RUN:
             await self.repository.mark_as_notified([i.id for i in pending])
             logger.info(MessageStrings.NOTIFY_BASELINE.format(count=len(pending)))
@@ -205,9 +215,9 @@ class AnnouncementService:
         dtos = [AnnouncementResponse.from_entity(i) for i in items]
         return dtos, total_count
 
-    async def get_stats(self) -> SystemStatsResponse:
+    async def get_stats(self, only_active: bool = False) -> SystemStatsResponse:
         """Sistem istatistiklerini döner."""
-        return await self.repository.get_system_stats()
+        return await self.repository.get_system_stats(only_active=only_active)
 
     def get_scraper_statuses(self) -> List[ScraperRunStatus]:
         """Tüm kazayıcıların en son çalışma metriklerini döner."""

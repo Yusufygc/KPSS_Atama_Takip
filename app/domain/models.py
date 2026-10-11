@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
 
+from app.core.dates import day_of_timestamp, parse_deadline_iso
 from app.core.text import fold_turkish
 
 
@@ -67,6 +68,8 @@ class Announcement:
     pdf_url: Optional[str] = None
     publish_date: Optional[str] = None
     deadline_date: Optional[str] = None
+    # deadline_date'ten türetilen normalize son başvuru günü (YYYY-MM-DD); ayrıştırılamazsa None
+    deadline_on: Optional[str] = None
     raw_content: Optional[str] = None
     matched_score_types: List[ScoreType] = field(default_factory=list)
     priority_level: PriorityLevel = PriorityLevel.NORMAL
@@ -78,7 +81,10 @@ class Announcement:
     )
 
     def __post_init__(self) -> None:
-        """Hash ID boşsa otomatik olarak hesaplar."""
+        """Hash ID ve normalize son başvuru gününü boşsa otomatik olarak hesaplar."""
+        if self.deadline_on is None and self.deadline_date:
+            # Yılsız tarihler ("12 Ekim - 26 Ekim") ilanın oluşturulduğu güne göre yorumlanır
+            self.deadline_on = parse_deadline_iso(self.deadline_date, day_of_timestamp(self.created_at))
         if not self.hash_id:
             self.hash_id = compute_announcement_hash(
                 source_key=self.source_key,

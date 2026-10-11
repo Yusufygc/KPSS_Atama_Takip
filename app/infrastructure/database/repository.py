@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import aiosqlite
 
+from app.core.dates import today_in_turkey
 from app.core.logging import get_logger
 from app.core.text import fold_turkish
 from app.domain.models import Announcement, PriorityLevel, ScoreType, build_search_text
@@ -18,11 +19,11 @@ logger = get_logger("database.repository")
 INSERT_SQL = """
 INSERT OR IGNORE INTO announcements (
     hash_id, source_key, source_name, title, institution,
-    position, city, url, pdf_url, publish_date, deadline_date,
+    position, city, url, pdf_url, publish_date, deadline_date, deadline_on,
     raw_content, matched_score_types, priority_level,
     field_tags, is_it_field,
     is_notified, notified_at, created_at, search_text
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 """
 
 
@@ -53,6 +54,7 @@ def _insert_params(item: Announcement) -> tuple:
         item.pdf_url,
         item.publish_date,
         item.deadline_date,
+        item.deadline_on,
         item.raw_content,
         json.dumps([s.value for s in item.matched_score_types]),
         item.priority_level.value,
@@ -113,6 +115,7 @@ class AnnouncementRepository:
             pdf_url=row["pdf_url"],
             publish_date=row["publish_date"],
             deadline_date=row["deadline_date"],
+            deadline_on=row["deadline_on"] if "deadline_on" in row.keys() else None,
             raw_content=row["raw_content"],
             matched_score_types=score_types,
             priority_level=self._safe_priority(row["priority_level"]),
@@ -184,6 +187,11 @@ class AnnouncementRepository:
 
         if params.only_unnotified:
             conditions.append("is_notified = 0")
+
+        if params.only_active:
+            # Son başvuru günü geçmemiş veya tarihi bilinmeyen ilanlar
+            conditions.append("(deadline_on IS NULL OR deadline_on >= ?)")
+            sql_params.append(today_in_turkey().isoformat())
 
         if params.only_p3:
             conditions.append("matched_score_types LIKE '%P3%'")
@@ -279,50 +287,36 @@ class AnnouncementRepository:
             await conn.commit()
             return cursor.rowcount
 
-    async def get_system_stats(self) -> SystemStatsResponse:
-        """Sistem genel istatistiklerini hesaplar."""
+    @staticmethod
+    def _active_clause(only_active: bool) -> Tuple[str, List[Any]]:
+        """only_active için WHERE parçası ve parametresi (süresi dolmamış veya tarihi bilinmeyen)."""
+        if not only_active:
+            return "", []
+        return " WHERE (deadline_on IS NULL OR deadline_on >= ?)", [today_in_turkey().isoformat()]
+
+    async def get_system_stats(self, only_active: bool = False) -> SystemStatsResponse:
+        """Sistem genel istatistiklerini hesaplar (only_active: süresi dolanlar sayılmaz)."""
+        where, params = self._active_clause(only_active)
+        # Tek tarama: koşullu toplamlar. Puan türleri JSON metni içinde aranır ve örtüşebilir.
+        stats_sql = (
+            "SELECT COUNT(*), "  # noqa: S608  # nosec B608 (where yalnızca sabit koşul + ? yer tutucusu)
+            "SUM(CASE WHEN is_notified = 0 THEN 1 ELSE 0 END), "
+            "SUM(CASE WHEN matched_score_types LIKE '%P3%' THEN 1 ELSE 0 END), "
+            "SUM(CASE WHEN matched_score_types LIKE '%P1%' OR matched_score_types LIKE '%P2%' THEN 1 ELSE 0 END), "
+            "SUM(CASE WHEN matched_score_types NOT LIKE '%P1%' AND matched_score_types NOT LIKE '%P2%' "
+            "AND matched_score_types NOT LIKE '%P3%' THEN 1 ELSE 0 END), "
+            "SUM(CASE WHEN is_it_field = 1 OR (field_tags IS NOT NULL AND field_tags != '[]') THEN 1 ELSE 0 END) "
+            f"FROM announcements{where};"
+        )
+        source_sql = f"SELECT source_key, COUNT(*) FROM announcements{where} GROUP BY source_key;"  # noqa: S608  # nosec B608
+
         async with get_db_connection(self.db_path) as conn:
-            # Toplam ve bildirilmemiş
-            async with conn.execute(
-                "SELECT COUNT(*), SUM(CASE WHEN is_notified = 0 THEN 1 ELSE 0 END) FROM announcements;"
-            ) as cursor:
+            async with conn.execute(stats_sql, params) as cursor:
                 row = await cursor.fetchone()
-                total = row[0] or 0
-                unnotified = row[1] or 0
+            async with conn.execute(source_sql, params) as cursor:
+                by_source = {r[0]: r[1] for r in await cursor.fetchall()}
 
-            # Puan türleri
-            async with conn.execute(
-                "SELECT COUNT(*) FROM announcements WHERE matched_score_types LIKE '%P3%';"
-            ) as cursor:
-                p3_count = (await cursor.fetchone())[0] or 0
-
-            async with conn.execute(
-                "SELECT COUNT(*) FROM announcements WHERE matched_score_types LIKE '%P1%' OR matched_score_types LIKE '%P2%';"
-            ) as cursor:
-                p1_p2_count = (await cursor.fetchone())[0] or 0
-
-            # Hiçbir KPSS puan türüyle eşleşmeyen (genel) ilanlar
-            async with conn.execute(
-                "SELECT COUNT(*) FROM announcements WHERE matched_score_types NOT LIKE '%P1%' "
-                "AND matched_score_types NOT LIKE '%P2%' AND matched_score_types NOT LIKE '%P3%';"
-            ) as cursor:
-                general_count = (await cursor.fetchone())[0] or 0
-
-            # Bilişim / Bilgisayar alanı sayısı
-            async with conn.execute(
-                "SELECT COUNT(*) FROM announcements WHERE is_it_field = 1 OR (field_tags IS NOT NULL AND field_tags != '[]');"
-            ) as cursor:
-                it_count = (await cursor.fetchone())[0] or 0
-
-            # Portallara göre dağılım
-            by_source: Dict[str, int] = {}
-            async with conn.execute(
-                "SELECT source_key, COUNT(*) FROM announcements GROUP BY source_key;"
-            ) as cursor:
-                rows = await cursor.fetchall()
-                for r in rows:
-                    by_source[r[0]] = r[1]
-
+        total, unnotified, p3_count, p1_p2_count, general_count, it_count = (v or 0 for v in row)
         return SystemStatsResponse(
             total_announcements=total,
             total_unnotified=unnotified,
@@ -333,17 +327,16 @@ class AnnouncementRepository:
             by_source=by_source,
         )
 
-    async def get_distinct_cities(self) -> List[Dict[str, Any]]:
-        """Kayıtlı şehirlerin listesini ve her birindeki aktif ilan sayısını döner."""
-        sql = """
-        SELECT city, COUNT(*) as count 
-        FROM announcements 
-        WHERE city IS NOT NULL AND city != ''
-        GROUP BY city 
-        ORDER BY count DESC, city ASC;
-        """
+    async def get_distinct_cities(self, only_active: bool = False) -> List[Dict[str, Any]]:
+        """Kayıtlı şehirlerin listesini ve her birindeki ilan sayısını döner."""
+        where, params = self._active_clause(only_active)
+        condition = "city IS NOT NULL AND city != ''"
+        where = f"{where} AND {condition}" if where else f" WHERE {condition}"
+        sql = (
+            f"SELECT city, COUNT(*) AS count FROM announcements{where} "  # noqa: S608  # nosec B608
+            "GROUP BY city ORDER BY count DESC, city ASC;"
+        )
         async with get_db_connection(self.db_path) as conn:
-            async with conn.execute(sql) as cursor:
+            async with conn.execute(sql, params) as cursor:
                 rows = await cursor.fetchall()
                 return [{"name": row["city"], "count": row["count"]} for row in rows]
-

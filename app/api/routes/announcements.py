@@ -36,6 +36,7 @@ async def list_announcements(
     only_it: bool = Query(False, description="Sadece Bilgisayar & Bilişim / Yazılım ilanları"),
     field_tag: Optional[str] = Query(None, description="Bilişim alt uzmanlık etiketi"),
     only_unnotified: bool = Query(False, description="Sadece bildirilmemiş olanlar"),
+    only_active: bool = Query(False, description="Süresi dolmamış (veya tarihi bilinmeyen) ilanlar"),
     limit: int = Query(50, ge=1, le=200, description="Sayfa boyutu"),
     offset: int = Query(0, ge=0, description="Sayfa başlangıcı"),
 ):
@@ -49,6 +50,7 @@ async def list_announcements(
         only_it=only_it,
         field_tag=field_tag,
         only_unnotified=only_unnotified,
+        only_active=only_active,
         limit=limit,
         offset=offset,
     )
@@ -62,15 +64,21 @@ async def list_announcements(
 
 
 @router.get("/cities", response_model=List[CityCountResponse])
-async def list_cities(service: AnnouncementServiceDep):
-    """Aktif ilanlarda geçen şehirleri ve ilan sayılarını döner."""
-    return await service.repository.get_distinct_cities()
+async def list_cities(
+    service: AnnouncementServiceDep,
+    only_active: bool = Query(False, description="Yalnızca süresi dolmamış ilanlar"),
+):
+    """İlanlarda geçen şehirleri ve ilan sayılarını döner."""
+    return await service.repository.get_distinct_cities(only_active=only_active)
 
 
 @router.get("/stats", response_model=SystemStatsResponse)
-async def get_system_stats(service: AnnouncementServiceDep):
+async def get_system_stats(
+    service: AnnouncementServiceDep,
+    only_active: bool = Query(False, description="Yalnızca süresi dolmamış ilanlar"),
+):
     """Sistem geneli toplam ve puan türü bazlı istatistikleri döner."""
-    return await service.get_stats()
+    return await service.get_stats(only_active=only_active)
 
 
 @router.get("/{announcement_id}", response_model=AnnouncementResponse)
