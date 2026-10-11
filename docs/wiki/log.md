@@ -4,6 +4,17 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-12] QA-2 | Tarih Normalizasyonu, Arka Plan Tarama ve Kalan QA Maddeleri
+* **Tarih normalizasyonu:** `app/core/dates.py` farklı portal biçimlerini (`13.10.2026`, ISO, `09 Ekim 2026`, yılsız `12 Ekim - 26 Ekim`) `deadline_on` (YYYY-MM-DD) alanına çevirir. API `only_active`, `deadline_on`, `is_expired` sunar; arayüzde "Süresi dolanları gizle" anahtarı ve kalan gün rozeti vardır; süresi dolanlar listenin sonuna alınır ve Telegram'a bildirilmez.
+* **Arka plan tarama:** `POST /api/scrapers/run` 202 döner (`?wait=true` eşzamanlı), `GET /api/scrapers/run/status` durumu verir; "Şimdi Tara" ilerlemeyi bu uç noktadan izler.
+* **Arayüz:** `AbortController` ile istek yarışı giderildi.
+* **PDF önbelleği:** Dosyalar `hash_id` ile adlandırılır; eski ID tabanlı dosyalar taşınır, yetim/90 günden eski dosyalar silinir.
+* **Diğer:** kalıcı 4xx hataları yeniden denenmez, `Retry-After` HTTP-date güvenli, açılışta ilk tarama (`SCRAPER_RUN_ON_STARTUP`), portal başına tek commit, `BaseNotifier.is_ready`, doküman düzeltmeleri.
+* **Test altyapısı:** Testler gerçek ağa/Telegram'a çıkamaz (`forbid_real_network`), paylaşılan bildirici etkisizleştirilir. Bir test hatası (`monkeypatch.undo()`) geliştirme sırasında gerçek DB'ye yazıp Telegram'a mesaj göndermişti; kök neden kapatıldı.
+* Bağlantılar: [[notifications]], [[scrapers]], [[architecture]]
+
+---
+
 ## [2026-10-12] QA | QA Taraması Bulgularının Düzeltilmesi
 * **SBB mükerrer ilan hatası (kritik):** `kod` URL parametresi her istekte değiştiği için hash URL'ye bağlıyken her taramada ~128 SBB ilanı "yeni" ekleniyordu. Kimlik artık başlık+son tarihten üretiliyor (`stable_url=False`); eski kayıtlar açılışta yeniden hash'lenip mükerrerler siliniyor.
 * **Arama / etiket:** `search_text` ile Türkçe harf duyarsız arama; `field_tags` gerçek Türkçe karakterle saklanıyor, eski kaçışlı kayıtlar onarılıyor.
