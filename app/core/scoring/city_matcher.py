@@ -7,12 +7,12 @@
 import re
 from typing import Dict, List, Optional, Tuple
 
+from app.core.text import turkish_upper
+
 
 def _normalize_turkish(text: str) -> str:
     """Türkçe karakterleri büyük harf ve arama için normalize eder."""
-    if not text:
-        return ""
-    return text.replace("i", "İ").replace("ı", "I").upper()
+    return turkish_upper(text)
 
 
 class CityMatcher:
@@ -77,7 +77,6 @@ class CityMatcher:
         "MEHMET AKİF ERSOY ÜNİVERSİTESİ": "Burdur",
         "NAMIK KEMAL ÜNİVERSİTESİ": "Tekirdağ",
         "ABANT İZZET BAYSAL": "Bolu",
-        "İNÖNÜ ÜNİVERSİTESİ": "Malatya",
         "BOZOK ÜNİVERSİTESİ": "Yozgat",
         "KORU KAMPÜSÜ": "Ankara"
     }

@@ -1,9 +1,10 @@
 """KPSS Atama Takip - Bilgisayar Mühendisliği ve Bilişim / Yazılım Alan Eşleştirme Motoru."""
 
-from enum import Enum
 import re
-import unicodedata
-from typing import List, Tuple
+from enum import Enum
+from typing import List, Optional, Tuple
+
+from app.core.text import turkish_upper
 
 
 class ITSubField(str, Enum):
@@ -19,12 +20,8 @@ class ITSubField(str, Enum):
 
 
 def _normalize_text(text: str) -> str:
-    """Türkçe karakterleri ve Unicode varyasyonlarını karşılaştırma için normalize eder."""
-    if not text:
-        return ""
-    # Türkçe büyük harf dönüşümü
-    t = text.replace("i", "İ").replace("ı", "I").upper()
-    return t
+    """Türkçe karakterleri karşılaştırma için büyük harfe normalize eder."""
+    return turkish_upper(text)
 
 
 class ITFieldMatcher:
@@ -157,7 +154,7 @@ class ITFieldMatcher:
         institution: str = "",
         position: str = "",
         raw_content: str = "",
-        tags: List[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> bool:
         """İlanın Bilgisayar Mühendisliği / Bilişim ile ilgili olup olmadığını döner."""
         if tags is not None:

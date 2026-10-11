@@ -2,6 +2,8 @@
 
 import re
 from typing import List, Tuple
+
+from app.core.text import turkish_upper
 from app.domain.models import PriorityLevel, ScoreType
 
 
@@ -65,7 +67,7 @@ class KPSSScoreMatcher:
         raw_content: str = "",
     ) -> Tuple[List[ScoreType], PriorityLevel]:
         """Verilen metinleri analiz ederek eşleşen puan türlerini ve öncelik seviyesini döner."""
-        full_text = f"{title} {institution} {raw_content}".upper()
+        full_text = turkish_upper(f"{title} {institution} {raw_content}")
         matched_scores: List[ScoreType] = []
 
         # 1. Açık (Explicit) Puan Kontrolü
