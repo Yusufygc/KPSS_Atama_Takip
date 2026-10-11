@@ -94,3 +94,24 @@ async def test_dto_conversion(repo):
     dto = AnnouncementResponse.from_entity(stored[0])
     assert dto.priority_icon == "🎓"
     assert dto.document_url == f"/api/announcements/{stored[0].id}/document"
+
+
+async def test_init_database_fixes_legacy_kariyer_kapisi_urls(db_ready):
+    from app.infrastructure.database.connection import init_database
+
+    repo = AnnouncementRepository()
+    bad = "https://kariyerkapisi.gov.tr/isealim/IlanDetay?i=g1"
+    good = "https://kariyerkapisi.gov.tr/IlanDetay?i=g1"
+    legacy = make("Eski", [ScoreType.P3], url=bad)
+    legacy_dup = make("Cift", [ScoreType.P3], url=bad)
+    already_fixed = make("Cift", [ScoreType.P3], url=good)  # düzeltilmiş hali zaten kayıtlı
+    await repo.save_many([legacy, legacy_dup, already_fixed])
+
+    await init_database()
+
+    items, total = await repo.list_announcements(AnnouncementFilterParams())
+    assert total == 2, "Mükerrer olacak eski satır silinmeli"
+    assert all("/isealim/" not in i.url for i in items)
+
+    # Düzeltilen ilan bir sonraki taramada yeni sanılmamalı
+    assert await repo.save(make("Eski", [ScoreType.P3], url=good)) is None

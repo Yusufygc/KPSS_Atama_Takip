@@ -9,6 +9,7 @@ import aiosqlite
 from app.config import settings
 from app.core.exceptions.database import DatabaseException
 from app.core.logging import get_logger
+from app.domain.models import compute_announcement_hash
 
 logger = get_logger("database.connection")
 
@@ -68,6 +69,37 @@ async def get_db_connection(
         raise DatabaseException(f"Veritabanı bağlantısı kurulamadı: {e}") from e
 
 
+LEGACY_KK_URL_PREFIX = "https://kariyerkapisi.gov.tr/isealim/IlanDetay?"
+FIXED_KK_URL_PREFIX = "https://kariyerkapisi.gov.tr/IlanDetay?"
+
+
+async def _fix_legacy_kariyer_kapisi_urls(conn: aiosqlite.Connection) -> None:
+    """Hatalı '/isealim/IlanDetay' bağlantılarını ('/IlanDetay') düzeltir.
+
+    Eski yol portalın WAF'ında 406 ile engelleniyordu. hash_id URL'den türetildiği için
+    hash de yeniden hesaplanır; aksi halde bir sonraki taramada aynı ilanlar yeni sanılıp
+    mükerrer eklenir ve tekrar bildirilirdi.
+    """
+    async with conn.execute(
+        "SELECT id, source_key, title, url, deadline_date FROM announcements WHERE url LIKE ?;",
+        (f"{LEGACY_KK_URL_PREFIX}%",),
+    ) as cursor:
+        rows = await cursor.fetchall()
+
+    for row in rows:
+        new_url = FIXED_KK_URL_PREFIX + row["url"][len(LEGACY_KK_URL_PREFIX):]
+        new_hash = compute_announcement_hash(row["source_key"], row["title"], new_url, row["deadline_date"])
+        cursor = await conn.execute(
+            "UPDATE OR IGNORE announcements SET url = ?, hash_id = ? WHERE id = ?;",
+            (new_url, new_hash, row["id"]),
+        )
+        if cursor.rowcount == 0:
+            # Düzeltilmiş hash zaten kayıtlı: eski mükerrer satır silinir
+            await conn.execute("DELETE FROM announcements WHERE id = ?;", (row["id"],))
+    if rows:
+        logger.info(f"{len(rows)} Kariyer Kapısı ilan bağlantısı düzeltildi.")
+
+
 async def init_database(custom_path: Optional[Path] = None) -> None:
     """Veritabanı tablolarını ve indekslerini başlatır."""
     async with get_db_connection(custom_path) as conn:
@@ -83,5 +115,6 @@ async def init_database(custom_path: Optional[Path] = None) -> None:
                 await conn.execute("ALTER TABLE announcements ADD COLUMN is_it_field INTEGER DEFAULT 0;")
 
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_announcements_it ON announcements(is_it_field);")
+        await _fix_legacy_kariyer_kapisi_urls(conn)
         await conn.commit()
         logger.info("Veritabanı şeması ve indeksleri başarıyla doğrulandı.")

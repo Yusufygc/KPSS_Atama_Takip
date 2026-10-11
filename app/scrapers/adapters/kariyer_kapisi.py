@@ -17,6 +17,9 @@ class KariyerKapisiScraper(BaseScraper):
     portal_name = PortalStrings.KARIYER_KAPISI
     API_URL = "https://api.kariyerkapisi.gov.tr/api/ilan/GetIseAlimPage"
     BASE_PAGE_URL = "https://kariyerkapisi.gov.tr/isealim"
+    # Sitenin kendi JS'i (Main.js) "IlanDetay?i=" bağlantısını /isealim sayfasına göre göreli üretir;
+    # bu da kök dizindeki /IlanDetay yoludur. /isealim/IlanDetay WAF tarafından 406 ile engellenir.
+    DETAIL_URL_TEMPLATE = "https://kariyerkapisi.gov.tr/IlanDetay?i={guid}"
 
     async def scrape(self) -> List[AnnouncementCreate]:
         self.logger.info("Kariyer Kapısı API sorgulanıyor...")
@@ -58,7 +61,7 @@ class KariyerKapisiScraper(BaseScraper):
             if direct_link.startswith("http"):
                 url = direct_link
             elif guid:
-                url = f"https://kariyerkapisi.gov.tr/isealim/IlanDetay?i={guid}"
+                url = self.DETAIL_URL_TEMPLATE.format(guid=guid)
             else:
                 url = self.BASE_PAGE_URL
 

@@ -106,3 +106,23 @@ async def test_ilan_gov_raises_when_browser_missing(monkeypatch):
 async def test_live_kariyer_kapisi():
     items = await ScraperRegistry.get(PortalKeys.KARIYER_KAPISI).scrape()
     assert items and items[0].url.startswith("http")
+
+
+async def test_kariyer_kapisi_detail_url_uses_site_route(monkeypatch):
+    """/isealim/IlanDetay WAF'ta 406 döner; sitenin kendi kullandığı /IlanDetay yolu üretilmeli."""
+    scraper = ScraperRegistry.get(PortalKeys.KARIYER_KAPISI)
+
+    class FakeResponse:
+        def json(self):
+            return {"searchIlan": [
+                {"kurumAdi": "K", "ilanBaslik": "B", "guid": "abc-123", "basvuruLinki": ""},
+                {"kurumAdi": "K2", "ilanBaslik": "B2", "guid": "x", "basvuruLinki": "https://dis.test/basvur"},
+            ]}
+
+    async def fake_request(*args, **kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr(scraper, "_request", fake_request)
+    items = await scraper.scrape()
+    assert items[0].url == "https://kariyerkapisi.gov.tr/IlanDetay?i=abc-123"
+    assert items[1].url == "https://dis.test/basvur"
