@@ -1,11 +1,9 @@
-fastapi>=0.110.0
-uvicorn[standard]>=0.28.0
-httpx>=0.27.0
-beautifulsoup4>=4.12.0
-pydantic>=2.6.0
-pydantic-settings>=2.2.0
-python-dotenv>=1.0.0
-aiosqlite>=0.20.0
-apscheduler>=3.10.4
-python-multipart>=0.0.9
-aiofiles>=23.2.0
+# Doğrudan bağımlılıklar sabitlenmiştir (tekrarlanabilir build). Güncellemek için: pip-audit ile kontrol edin.
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+httpx==0.28.1
+beautifulsoup4==4.15.0
+pydantic==2.14.1
+pydantic-settings==2.15.0
+aiosqlite==0.22.1
+apscheduler==3.11.3

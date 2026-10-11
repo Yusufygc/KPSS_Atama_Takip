@@ -4,6 +4,18 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-12] SECURITY & QUALITY | Güvenlik Sertleştirmesi, Puanlama Hatası ve Test Altyapısı
+* **XSS:** Arayüzde kazınan veriler `escapeHtml`/`safeUrl` ile basılıyor; `javascript:` adresleri sunucuda reddediliyor.
+* **Puanlama hatası:** `str.upper()` Türkçe `i` harfini `I` yaptığı için "Bilgisayar mühendisi" gibi küçük harfli başlıklar P3 olarak eşleşmiyordu. Ortak `turkish_upper` (`app/core/text.py`) eklendi ve üç eşleştiricide kullanıldı.
+* **Telegram:** Mesaj alanları HTML kaçışlanıyor, bot token'ı loglardan temizleniyor.
+* **API anahtarı, CORS, güvenlik başlıkları, SSRF, TLS doğrulaması:** Ayrıntılar için [[security]].
+* **Güvenilirlik:** Chrome zaman aşımında öldürülüyor (süreç sızıntısı giderildi), eşzamanlı tarama kilidi (`409`), zamanlayıcıda `max_instances=1`, İŞKUR/İlan.gov.tr hataları artık "başarılı" görünmüyor, Resmî Gazete yalnızca ilan PDF bağlantılarını alıyor ve TRT (UTC+3) kullanıyor.
+* **Veri:** `general_count` düzeltildi (P3 ve P1/P2 örtüşmesi), `LIKE` joker karakterleri kaçışlandı, `save`/`save_many` SQL tekrarı kaldırıldı.
+* **Dağıtım:** Python 3.12, root olmayan kullanıcı, `.dockerignore`, sabitlenmiş bağımlılıklar (`requirements.txt`), geliştirme bağımlılıkları (`requirements-dev.txt`), CI iş akışı.
+* **Test:** Betik tarzı testler gerçek `pytest` testlerine çevrildi (geçici veritabanı, ağ yok; canlı testler `--run-live`). 71 test, kapsam %52 -> %75.
+* Bağlantılar: [[security]], [[rules]], [[scrapers]]
+
+
 ## [2026-10-10] REFACTOR & FEATURE | SVG Vektörel İkonlara Geçildi, Filtre Karmaşası Çözüldü ve Şehir Filtresi Eklendi
 * **Vektörel İkon Mimarisi (`web/js/icons.js`):** Arayüzdeki tüm emojiler kaldırıldı; Lucide ve modern tasarım standartlarında temiz SVG vektörel ikon kütüphanesi entegre edildi.
 * **Filtre Karmaşasının Çözülmesi:** Üst üste yığılan, tekrarlayan ve ekranı boğan 4 sıralı filtreleme yapısı kaldırıldı:

@@ -36,3 +36,9 @@ scratch/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Test / lint cache
+.coverage
+.pytest_cache/
+.ruff_cache/
+htmlcov/

@@ -4,7 +4,9 @@ services:
     container_name: kpss-atama-takip
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      # Varsayılan olarak yalnızca yerel makineden erişilir. Dışarı açmak için
+      # bir ters vekil (HTTPS) ve .env içinde API_KEY kullanın.
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env
     environment:
@@ -12,7 +14,15 @@ services:
       - APP_DEBUG=false
       - APP_HOST=0.0.0.0
       - APP_PORT=8000
+      - BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
+      # Kapsayıcı zaten izole olduğundan Chromium'un kendi sandbox'ı kapatılır
+      - BROWSER_NO_SANDBOX=true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     volumes:
+      # Sahiplik: uid 1000 (konteynerdeki 'app' kullanıcısı) yazabilmelidir
       - ./data:/app/data
       - ./logs:/app/logs
     healthcheck:

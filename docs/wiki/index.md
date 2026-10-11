@@ -17,5 +17,8 @@ Hoş geldiniz. Bu dizin, KPSS Atama Takip Projesi'nin mimarisini, veri kaynaklar
 ### 4. Bildirim & Entegrasyon Katmanı
 * [[notifications]]: Telegram Bot entegrasyonu, bildirim şablonları, mükerrer önleme (deduplication) mekanizması ve webhook/polling yapısı.
 
-### 5. Kayıt Defteri & Günlük
+### 5. Güvenlik
+* [[security]]: API anahtarı, XSS/SSRF korumaları, TLS, CORS, güvenlik başlıkları ve kapsayıcı sertleştirmesi.
+
+### 6. Kayıt Defteri & Günlük
 * [[log]]: Proje üzerinde gerçekleştirilen tüm önemli kararlar, mimari güncellemeler ve veri ekleme kayıtları.

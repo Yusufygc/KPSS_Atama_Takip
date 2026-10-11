@@ -1,0 +1,22 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "live: gerçek portallara ağ isteği atan testler (varsayılan olarak atlanır, --run-live ile çalışır)",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = ["venv", "scratch", "data", "logs"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "S"]
+ignore = [
+    "B008",  # FastAPI Depends/Query varsayılan argüman kalıbı
+    "S101",  # testlerde assert kullanımı
+    "S104",  # 0.0.0.0 yalnızca Docker için açıkça ayarlanır
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S"]
