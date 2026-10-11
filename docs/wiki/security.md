@@ -29,7 +29,14 @@ Bu doküman, uygulamanın güvenlik kararlarını ve işletim gereksinimlerini �
 * `./data` ve `./logs` bağlama dizinleri uid 1000 tarafından yazılabilir olmalıdır (`chown 1000:1000 data logs`).
 * Chromium'un kendi sandbox'ı yalnızca kapsayıcıda (`BROWSER_NO_SANDBOX=true`) kapatılır; yerel çalıştırmada sandbox açıktır.
 
-## 5. Geliştirme Kontrolleri
+## 5. Test Ortamı (gerçek dünyaya kapalı)
+* `APP_ENV=test` iken `app/config.py` doğrulayıcısı Telegram'ı **zorla kapatır** (token/chat ID boşaltılır, bildirim kapalı); ortam değişkeni veya `.env` ne derse desin geçersizdir.
+* `APP_ENV=test` ile gerçek veritabanı dosyası (`kpss_atama.db`) kullanılamaz; ayar yüklenirken hata verir.
+* Test ortamı `.env.test` dosyasını okur (`python run.py --test`, `baslat-test.bat` veya `docker-compose.test.yml`); gerçek `.env` hiç okunmaz. Port 8001, veritabanı `data/test/kpss_test.db`.
+* Örnek veri: `python scripts/seed_test_db.py [--reset]` (18 gerçekçi ilan; süresi dolmuş, yaklaşan, tarihsiz, bildirilmiş/bekleyen karışımı). Betik gerçek DB dosya adını yazmayı reddeder.
+* `pytest` testleri ayrıca gerçek ağa çıkamaz ve paylaşılan bildirici etkisizleştirilir (`tests/conftest.py`).
+
+## 6. Geliştirme Kontrolleri
 * `ruff check .`, `bandit -r app run.py -ll`, `pip-audit -r requirements.txt` ve `pytest` CI'da (`.github/workflows/ci.yml`) çalışır.
 * Canlı portal testleri varsayılan olarak atlanır: `pytest --run-live`.
 

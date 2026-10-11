@@ -1,9 +1,16 @@
 """KPSS Atama Takip Sistemi - Uygulama Başlatıcı (Runner)."""
 
+import os
 import sys
 from pathlib import Path
 
 import uvicorn
+
+# `python run.py --test`: gerçek Telegram/veritabanı olmadan test ortamını (.env.test) kullanır.
+# Ayarlar içe aktarılmadan ÖNCE seçilmelidir.
+if "--test" in sys.argv:
+    sys.argv.remove("--test")
+    os.environ["APP_ENV_FILE"] = ".env.test"
 
 # Proje kök dizinini ekle
 BASE_DIR = Path(__file__).resolve().parent

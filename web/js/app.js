@@ -113,6 +113,14 @@ function describeDeadline(item) {
     return { text: `${label} · ${daysLeft} gün kaldı`, tone: 'neutral' };
 }
 
+// "2026-10-10" biçimindeki yayın tarihini okunur biçime çevirir (geçersizse null)
+function describePublishDate(isoDate) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate || '');
+    if (!match) return null;
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 const DEADLINE_TONE_CLASSES = {
     neutral: 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800',
     urgent: 'text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/60',
@@ -356,6 +364,15 @@ function renderAnnouncements(items) {
             </div>
         ` : '';
 
+        // Son başvuru tarihi olmayan kaynaklarda (Resmî Gazete) yayın tarihi gösterilir
+        const publishInfo = !deadlineInfo && item.publish_date ? describePublishDate(item.publish_date) : null;
+        const publishBadge = publishInfo ? `
+            <div class="flex items-center text-xs font-semibold px-2.5 py-1 rounded-lg space-x-1.5 ${DEADLINE_TONE_CLASSES.neutral}">
+                ${SVG_ICONS.calendar}
+                <span>Yayın: ${escapeHtml(publishInfo)}</span>
+            </div>
+        ` : '';
+
         // Şehir Bilgisi
         const cityBadge = item.city ? `
             <span class="inline-flex items-center text-xs text-slate-600 dark:text-slate-400 font-medium space-x-1">
@@ -365,7 +382,9 @@ function renderAnnouncements(items) {
         ` : '';
 
         // PDF Belge Butonu
-        const pdfButton = item.document_url ? `
+        // Yalnızca ilan sayfasından farklı bir PDF adresi varsa gösterilir (aynı bağlantı iki kez çıkmasın)
+        const hasSeparatePdf = item.document_url && item.pdf_url && item.pdf_url !== item.url;
+        const pdfButton = hasSeparatePdf ? `
             <a href="${escapeHtml(safeUrl(item.document_url))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Resmi Belgeyi (PDF) Aç">
                 ${SVG_ICONS.fileText}
                 <span>PDF</span>
@@ -384,6 +403,17 @@ function renderAnnouncements(items) {
                 <a href="${escapeHtml(docUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-all active:scale-95" title="Resmi İlan Metnini (PDF) Aç">
                     ${SVG_ICONS.fileText}
                     <span>İlan Metni (PDF)</span>
+                    ${SVG_ICONS.arrowRight}
+                </a>
+            `;
+        } else if (item.source_key === 'resmi_gazete') {
+            // Resmî Gazete ilanlarında başvuru koşulları yalnızca PDF içindedir: doğrudan PDF'e bağlanır
+            const pdfTarget = safeUrl(item.pdf_url || item.url);
+            actionButtons = `
+                <span class="hidden md:inline text-[11px] text-slate-400 dark:text-slate-500">Başvuru koşulları PDF içinde</span>
+                <a href="${escapeHtml(pdfTarget)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-all active:scale-95" title="Resmî Gazete ilan PDF'ini aç">
+                    ${SVG_ICONS.fileText}
+                    <span>İlan PDF'ini Aç</span>
                     ${SVG_ICONS.arrowRight}
                 </a>
             `;
@@ -428,7 +458,7 @@ function renderAnnouncements(items) {
 
                     <!-- Sağ Taraf: Tarih ve Butonlar -->
                     <div class="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800">
-                        ${deadlineBadge}
+                        ${deadlineBadge}${publishBadge}
                         <div class="flex items-center space-x-2">
                             ${actionButtons}
                         </div>

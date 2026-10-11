@@ -1,0 +1,32 @@
+# TEST ortamı: ayrı konteyner, ayrı port (8001) ve ayrı veritabanı (data/test/kpss_test.db).
+# .env (gerçek Telegram bilgileri) KULLANILMAZ; APP_ENV=test iken uygulama Telegram'ı zorla kapatır.
+#   Önce örnek veriyi oluşturun:  python scripts/seed_test_db.py
+#   Başlatın:                      docker compose -f docker-compose.test.yml up --build
+services:
+  kpss-tracker-test:
+    build: .
+    image: kpss-atama-takip:test
+    container_name: kpss-atama-takip-test
+    ports:
+      - "127.0.0.1:8001:8000"
+    env_file:
+      - .env.test
+    environment:
+      - APP_ENV=test
+      - APP_DEBUG=false
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8000
+      - DATABASE_PATH=data/kpss_test.db
+      - BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
+      - BROWSER_NO_SANDBOX=true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - ./data/test:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

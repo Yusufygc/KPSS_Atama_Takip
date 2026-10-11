@@ -1,9 +1,18 @@
 """KPSS Atama Takip - Merkezi Yapılandırma Yönetimi."""
 
+import os
 from pathlib import Path
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Gerçek (canlı) veritabanı dosya adı; test ortamı bu dosyayı kullanamaz
+LIVE_DATABASE_FILENAME = "kpss_atama.db"
+
+# Hangi .env dosyasının okunacağı APP_ENV_FILE ile seçilir (örn. test ortamı için ".env.test").
+# Seçilen dosya yalnızca kendisi okunur; böylece .env içindeki gerçek Telegram bilgileri yüklenmez.
+ENV_FILE = os.environ.get("APP_ENV_FILE", ".env")
 
 
 class AppSettings(BaseSettings):
@@ -53,10 +62,25 @@ class AppSettings(BaseSettings):
     BROWSER_NO_SANDBOX: bool = False
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def _isolate_test_environment(self) -> "AppSettings":
+        """Test ortamı gerçek dünyaya dokunamaz: Telegram kapatılır ve canlı veritabanı yasaktır."""
+        if self.APP_ENV != "test":
+            return self
+        self.TELEGRAM_NOTIFICATIONS_ENABLED = False
+        self.TELEGRAM_BOT_TOKEN = ""
+        self.TELEGRAM_CHAT_ID = ""
+        if Path(self.DATABASE_PATH).name == LIVE_DATABASE_FILENAME:
+            raise ValueError(
+                f"APP_ENV=test gerçek veritabanını ({LIVE_DATABASE_FILENAME}) kullanamaz; "
+                "DATABASE_PATH olarak ayrı bir test dosyası verin (örn. data/test/kpss_test.db)."
+            )
+        return self
 
     @property
     def is_production(self) -> bool:

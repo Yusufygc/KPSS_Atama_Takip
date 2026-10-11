@@ -4,6 +4,14 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-12] TEST ORTAMI | Gerçek Telegram'a ve Gerçek DB'ye Kapalı Test Ortamı
+* `.env.test`, `python run.py --test`, `baslat-test.bat`, `docker-compose.test.yml` (port 8001) ve `scripts/seed_test_db.py` (`data/test/kpss_test.db`) eklendi.
+* `APP_ENV=test` Telegram'ı zorla kapatır ve `kpss_atama.db` kullanımını reddeder; bkz. [[security]].
+* Resmî Gazete kartları doğrudan ilan PDF'ine bağlanır ve yayın tarihini gösterir (başvuru koşulları PDF içindedir).
+* Bağlantılar: [[security]], [[scrapers]]
+
+---
+
 ## [2026-10-12] QA-2 | Tarih Normalizasyonu, Arka Plan Tarama ve Kalan QA Maddeleri
 * **Tarih normalizasyonu:** `app/core/dates.py` farklı portal biçimlerini (`13.10.2026`, ISO, `09 Ekim 2026`, yılsız `12 Ekim - 26 Ekim`) `deadline_on` (YYYY-MM-DD) alanına çevirir. API `only_active`, `deadline_on`, `is_expired` sunar; arayüzde "Süresi dolanları gizle" anahtarı ve kalan gün rozeti vardır; süresi dolanlar listenin sonuna alınır ve Telegram'a bildirilmez.
 * **Arka plan tarama:** `POST /api/scrapers/run` 202 döner (`?wait=true` eşzamanlı), `GET /api/scrapers/run/status` durumu verir; "Şimdi Tara" ilerlemeyi bu uç noktadan izler.
