@@ -15,6 +15,7 @@ from app.core.constants.settings import SecurityConstants
 from app.core.exceptions.base import KPSSBaseException
 from app.core.logging import get_logger, setup_root_logger
 from app.infrastructure.database.connection import init_database
+from app.services.document_cache import migrate_and_cleanup
 from app.services.scheduler import SchedulerService
 
 # Kök loglayıcıyı başlat
@@ -33,6 +34,7 @@ async def lifespan(app: FastAPI):
     
     # 1. Veritabanını ve tabloları başlat
     await init_database()
+    await migrate_and_cleanup(get_announcement_service().repository)
 
     # 2. Arka plan zamanlayıcısını başlat
     scheduler_service.start()

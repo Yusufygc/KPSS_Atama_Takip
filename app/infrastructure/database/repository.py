@@ -239,6 +239,14 @@ class AnnouncementRepository:
 
         return items, total_count
 
+    async def list_identifiers(self, source_key: str) -> List[Tuple[int, str]]:
+        """Bir kaynağa ait kayıtların (id, hash_id) çiftlerini döner."""
+        async with get_db_connection(self.db_path) as conn:
+            async with conn.execute(
+                "SELECT id, hash_id FROM announcements WHERE source_key = ?;", (source_key,)
+            ) as cursor:
+                return [(row["id"], row["hash_id"]) for row in await cursor.fetchall()]
+
     async def count_all(self) -> int:
         """Toplam ilan sayısını döner."""
         async with get_db_connection(self.db_path) as conn:

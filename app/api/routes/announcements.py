@@ -19,6 +19,7 @@ from app.domain.schemas import (
     CityCountResponse,
     SystemStatsResponse,
 )
+from app.services.document_cache import cache_path_for
 
 logger = get_logger("routes.announcements")
 
@@ -146,7 +147,7 @@ async def view_announcement_document(
             raise HTTPException(status_code=400, detail=ErrorStrings.DOCUMENT_HOST_NOT_ALLOWED)
 
         settings.DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
-        cached_file = settings.DOCUMENTS_DIR / f"sbb_{item.id}.pdf"
+        cached_file = cache_path_for(item.hash_id)
         if (
             cached_file.exists()
             and cached_file.stat().st_size > ScraperLimits.DOCUMENT_MIN_VALID_BYTES
