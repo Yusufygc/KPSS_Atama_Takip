@@ -40,6 +40,7 @@ class ScraperLimits:
     DOCUMENT_ALLOWED_DOMAINS = ("kamuilan.sbb.gov.tr",)
     BROWSER_TIMEOUT_SECONDS = 30.0
     SCRAPER_JOB_TIMEOUT_SECONDS = 300.0
+    ISKUR_MAX_PAGES = 20  # sayfalama güvenlik sınırı
     DEFAULT_PAGE_SIZE = 50
     TITLE_MAX_LENGTH = 500
     INSTITUTION_MAX_LENGTH = 250

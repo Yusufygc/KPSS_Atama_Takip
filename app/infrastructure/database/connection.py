@@ -186,6 +186,20 @@ async def _rescore_if_outdated(conn: aiosqlite.Connection) -> None:
     logger.info(f"Puanlama sürümü {SCORING_VERSION}: {changed}/{len(rows)} kayıt yeniden puanlandı.")
 
 
+async def _remove_legacy_iskur_rows(conn: aiosqlite.Connection) -> None:
+    """Eski İŞKUR kayıtlarını (hepsi aynı liste sayfası URL'sine sahipti) siler.
+
+    Yeni kazıyıcı her ilan için benzersiz detay URL'si üretir; eski satırlar kalırsa aynı
+    ilanlar mükerrer görünürdü. İlanlar bir sonraki taramada doğru biçimde yeniden eklenir.
+    """
+    legacy_url = "https://esube.iskur.gov.tr/Istihdam/AcikIsIlanAra.aspx"
+    cursor = await conn.execute(
+        "DELETE FROM announcements WHERE source_key = 'iskur' AND url = ?;", (legacy_url,)
+    )
+    if cursor.rowcount:
+        logger.info(f"{cursor.rowcount} eski İŞKUR kaydı temizlendi.")
+
+
 async def init_database(custom_path: Optional[Path] = None) -> None:
     """Veritabanı tablolarını ve indekslerini başlatır."""
     async with get_db_connection(custom_path) as conn:
@@ -206,6 +220,7 @@ async def init_database(custom_path: Optional[Path] = None) -> None:
         await _fix_legacy_kariyer_kapisi_urls(conn)
         await _backfill_search_text(conn)
         await _normalize_field_tags_encoding(conn)
+        await _remove_legacy_iskur_rows(conn)
         await _rescore_if_outdated(conn)
         await conn.commit()
         logger.info("Veritabanı şeması ve indeksleri başarıyla doğrulandı.")

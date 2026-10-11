@@ -198,3 +198,20 @@ async def test_init_database_rescoring_runs_once_per_version(db_ready):
     conn = sqlite3.connect(settings.resolved_database_path)
     assert conn.execute("PRAGMA user_version").fetchone()[0] == SCORING_VERSION
     conn.close()
+
+
+async def test_init_database_removes_legacy_iskur_rows(db_ready):
+    from app.infrastructure.database.connection import init_database
+
+    repo = AnnouncementRepository()
+    legacy_url = "https://esube.iskur.gov.tr/Istihdam/AcikIsIlanAra.aspx"
+    await repo.save_many(
+        [
+            make("Eski İŞKUR", [ScoreType.GENERAL], source_key="iskur", url=legacy_url),
+            make("Yeni İŞKUR", [ScoreType.GENERAL], source_key="iskur", url=legacy_url + "?x=1"),
+            make("Başka kaynak", [ScoreType.GENERAL], url=legacy_url),
+        ]
+    )
+    await init_database()
+    _, total = await repo.list_announcements(AnnouncementFilterParams())
+    assert total == 2
