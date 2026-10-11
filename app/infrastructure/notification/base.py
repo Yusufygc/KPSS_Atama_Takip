@@ -1,6 +1,7 @@
 """KPSS Atama Takip - Bildirim Dağıtıcı Temel Arayüzü."""
 
 from abc import ABC, abstractmethod
+
 from app.domain.models import Announcement
 
 

@@ -1,6 +1,7 @@
 """KPSS Atama Takip - Doğrulama ve Veri Bütünlüğü İstisnaları."""
 
 from typing import Any, Dict, Optional
+
 from app.core.exceptions.base import KPSSBaseException
 
 

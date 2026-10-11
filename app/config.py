@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,12 +13,19 @@ class AppSettings(BaseSettings):
     APP_NAME: str = "KPSS Atama Takip Sistemi"
     APP_ENV: Literal["development", "production", "test"] = "development"
     APP_DEBUG: bool = True
-    APP_HOST: str = "0.0.0.0"
+    APP_HOST: str = "127.0.0.1"
     APP_PORT: int = 8000
+
+    # Güvenlik: Yönetim uç noktaları (tarama tetikleme, ayarlar) için X-API-Key değeri.
+    # Boş bırakılırsa geliştirme ortamında kontrol atlanır, prodüksiyonda uç noktalar kapalıdır.
+    API_KEY: str = ""
+    # Virgülle ayrılmış CORS kaynak listesi. Web UI aynı origin'den sunulduğu için varsayılan boştur.
+    CORS_ORIGINS: str = ""
 
     # Dizin Yolları
     BASE_DIR: Path = Path(__file__).resolve().parent.parent
     DATABASE_PATH: str = "data/kpss_atama.db"
+    DOCUMENTS_DIR: Path = Path(__file__).resolve().parent.parent / "data" / "documents"
     LOGS_DIR: Path = Path(__file__).resolve().parent.parent / "logs"
 
     # Telegram Entegrasyon Ayarları
@@ -28,7 +36,10 @@ class AppSettings(BaseSettings):
     # Kazıma & Zamanlama Parametreleri
     SCRAPER_INTERVAL_MINUTES: int = 15
     SCRAPER_CONCURRENT_WORKERS: int = 3
-    DEFAULT_HTTP_TIMEOUT_SECONDS: int = 15
+    # İlan.gov.tr için Chrome/Edge/Chromium yolu (boşsa otomatik aranır)
+    BROWSER_EXECUTABLE_PATH: str = ""
+    # Chromium sandbox'ı yalnızca zaten izole bir kapsayıcı (Docker) içinde kapatılmalıdır
+    BROWSER_NO_SANDBOX: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -40,6 +51,11 @@ class AppSettings(BaseSettings):
     def is_production(self) -> bool:
         """Ortamın prodüksiyon olup olmadığını döner."""
         return self.APP_ENV == "production"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        """Virgülle ayrılmış CORS_ORIGINS değerini temiz bir listeye çevirir."""
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip() and o.strip() != "*"]
 
     @property
     def resolved_database_path(self) -> Path:

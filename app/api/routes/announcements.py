@@ -1,17 +1,17 @@
 """KPSS Atama Takip - İlan REST Uç Noktaları."""
 
-from pathlib import Path
 from typing import List, Optional
+
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse
 
 from app.api.dependencies import AnnouncementServiceDep
+from app.config import settings
+from app.core.constants.settings import NetworkConstants, ScraperLimits
+from app.core.constants.strings import ErrorStrings
 from app.core.logging import get_logger
-
-logger = get_logger("routes.announcements")
-DOCUMENTS_DIR = Path("data/documents")
-DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
+from app.core.security import host_in_domains, is_http_url
 from app.domain.models import ScoreType
 from app.domain.schemas import (
     AnnouncementFilterParams,
@@ -19,6 +19,8 @@ from app.domain.schemas import (
     CityCountResponse,
     SystemStatsResponse,
 )
+
+logger = get_logger("routes.announcements")
 
 router = APIRouter(prefix="/announcements", tags=["İlanlar"])
 
@@ -83,6 +85,40 @@ async def get_announcement_by_id(
     return AnnouncementResponse.from_entity(item)
 
 
+def _pdf_response(path, institution: str) -> FileResponse:
+    """Önbellekteki PDF dosyasını tarayıcıda görüntülenecek şekilde döner."""
+    return FileResponse(
+        path=str(path),
+        media_type="application/pdf",
+        filename=f"{institution[:30]}_ilan_metni.pdf",
+        content_disposition_type="inline",
+    )
+
+
+async def _download_pdf_capped(url: str) -> Optional[bytes]:
+    """PDF'i boyut sınırıyla indirir; geçerli bir PDF değilse None döner."""
+    headers = {
+        "User-Agent": NetworkConstants.DEFAULT_USER_AGENT,
+        "Referer": "https://kamuilan.sbb.gov.tr/",
+    }
+    max_bytes = ScraperLimits.MAX_DOCUMENT_BYTES
+    # Yönlendirmeler kapalı: izin verilen host'tan başka adrese sıçrama (SSRF) engellenir
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
+        async with client.stream("GET", url, headers=headers) as resp:
+            if resp.status_code != 200:
+                logger.warning(f"SBB ilan belgesi alınamadı (HTTP {resp.status_code}): {url}")
+                return None
+            chunks: List[bytes] = []
+            size = 0
+            async for chunk in resp.aiter_bytes():
+                size += len(chunk)
+                if size > max_bytes:
+                    raise HTTPException(status_code=502, detail=ErrorStrings.DOCUMENT_TOO_LARGE)
+                chunks.append(chunk)
+    content = b"".join(chunks)
+    return content if content.startswith(b"%PDF") else None
+
+
 @router.get("/{announcement_id}/document")
 async def view_announcement_document(
     announcement_id: int,
@@ -93,52 +129,40 @@ async def view_announcement_document(
     if not item:
         raise HTTPException(status_code=404, detail="İlan bulunamadı.")
 
-    # Kamu İlan SBB ise, referer hotlink korumasını aşarak PDF'i sun
-    if item.source_key == "kamu_ilan_sbb" or "kamuilan.sbb.gov.tr" in item.url:
-        cached_file = DOCUMENTS_DIR / f"sbb_{item.id}.pdf"
-        if cached_file.exists() and cached_file.stat().st_size > 2000:
-            return FileResponse(
-                path=str(cached_file),
-                media_type="application/pdf",
-                filename=f"{item.institution[:30]}_ilan_metni.pdf",
-                content_disposition_type="inline",
-            )
+    allowed_domains = ScraperLimits.DOCUMENT_ALLOWED_DOMAINS
 
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            ),
-            "Referer": "https://kamuilan.sbb.gov.tr/",
-        }
+    # Kamu İlan SBB ise, referer hotlink korumasını aşarak PDF'i sun
+    if item.source_key == "kamu_ilan_sbb" or host_in_domains(item.url, allowed_domains):
+        if not host_in_domains(item.url, allowed_domains):
+            logger.warning(f"İzin verilmeyen belge adresi reddedildi (ilan {item.id}): {item.url}")
+            raise HTTPException(status_code=400, detail=ErrorStrings.DOCUMENT_HOST_NOT_ALLOWED)
+
+        settings.DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
+        cached_file = settings.DOCUMENTS_DIR / f"sbb_{item.id}.pdf"
+        if (
+            cached_file.exists()
+            and cached_file.stat().st_size > ScraperLimits.DOCUMENT_MIN_VALID_BYTES
+        ):
+            return _pdf_response(cached_file, item.institution)
+
         try:
-            async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
-                resp = await client.get(item.url, headers=headers)
-                if resp.status_code == 200 and resp.content.startswith(b"%PDF"):
-                    # Yerel önbelleğe kaydet
-                    cached_file.write_bytes(resp.content)
-                    return FileResponse(
-                        path=str(cached_file),
-                        media_type="application/pdf",
-                        filename=f"{item.institution[:30]}_ilan_metni.pdf",
-                        content_disposition_type="inline",
-                    )
-                else:
-                    logger.warning(
-                        f"SBB ilan belgesi alınamadı (HTTP {resp.status_code}): {item.url}"
-                    )
-                    raise HTTPException(
-                        status_code=502,
-                        detail="Kamu İlan (SBB) kaynağından ilan belgesi alınamadı.",
-                    )
+            content = await _download_pdf_capped(item.url)
         except httpx.RequestError as exc:
             logger.error(f"SBB bağlantı hatası: {exc}")
             raise HTTPException(
+                status_code=502, detail="Kamu İlan sunucusuna erişilemedi."
+            ) from exc
+
+        if content is None:
+            raise HTTPException(
                 status_code=502,
-                detail=f"Kamu İlan sunucusuna erişilemedi: {str(exc)}",
+                detail="Kamu İlan (SBB) kaynağından ilan belgesi alınamadı.",
             )
+        cached_file.write_bytes(content)
+        return _pdf_response(cached_file, item.institution)
 
-    # Diğer portallarda PDF varsa ona, yoksa normal web URL'sine yönlendir
+    # Diğer portallarda PDF varsa ona, yoksa normal web URL'sine yönlendir (yalnızca http/https)
     target_url = item.pdf_url or item.url
+    if not is_http_url(target_url):
+        raise HTTPException(status_code=404, detail="Geçerli bir belge adresi bulunamadı.")
     return RedirectResponse(url=target_url, status_code=307)
-

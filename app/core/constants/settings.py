@@ -35,7 +35,11 @@ class NetworkConstants:
 class ScraperLimits:
     """Kazıma motoru sınır ve eşik sabitleri."""
 
-    MAX_CONCURRENT_SCRAPERS = 5
+    MAX_DOCUMENT_BYTES = 20 * 1024 * 1024  # PDF proxy üst sınırı (20 MB)
+    DOCUMENT_MIN_VALID_BYTES = 2000
+    DOCUMENT_ALLOWED_DOMAINS = ("kamuilan.sbb.gov.tr",)
+    BROWSER_TIMEOUT_SECONDS = 30.0
+    SCRAPER_JOB_TIMEOUT_SECONDS = 300.0
     DEFAULT_PAGE_SIZE = 50
     TITLE_MAX_LENGTH = 500
     INSTITUTION_MAX_LENGTH = 250
@@ -50,3 +54,30 @@ class LoggingConstants:
     LOG_BACKUP_COUNT = 5                  # 5 adet dönen yedek dosya
     LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
     LOG_FORMAT = "%(asctime)s | %(levelname)-8s | [%(name)s] %(message)s"
+
+
+class SecurityConstants:
+    """HTTP güvenlik başlıkları ve içerik güvenlik politikası."""
+
+    # Tailwind Play CDN ve Google Fonts dışında harici kaynağa izin verilmez
+    CONTENT_SECURITY_POLICY = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "frame-ancestors 'none'"
+    )
+
+    CSP_EXEMPT_PATHS = ("/docs", "/redoc", "/openapi.json")
+
+    RESPONSE_HEADERS = {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "no-referrer",
+        "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+    }

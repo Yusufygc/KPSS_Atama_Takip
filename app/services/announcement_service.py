@@ -1,13 +1,16 @@
 """KPSS Atama Takip - İlan İş Mantığı ve Orkestrasyon Servisi."""
 
-from typing import Dict, List, Optional, Tuple
+import asyncio
+from typing import List, Optional, Tuple
 
-from app.core.constants.strings import MessageStrings
+from app.core.constants.strings import ErrorStrings, MessageStrings
+from app.core.exceptions.scraper import ScrapeInProgressException
 from app.core.logging import get_logger
 from app.core.scoring.city_matcher import CityMatcher
 from app.core.scoring.it_field_matcher import ITFieldMatcher
 from app.core.scoring.strategy import KPSSScoreMatcher
-from app.domain.models import Announcement, PriorityLevel, ScoreType
+from app.core.security import is_http_url
+from app.domain.models import Announcement
 from app.domain.schemas import (
     AnnouncementFilterParams,
     AnnouncementResponse,
@@ -33,9 +36,24 @@ class AnnouncementService:
         self.repository = repository or AnnouncementRepository()
         self.orchestrator = orchestrator or ScraperOrchestrator()
         self.notifier = notifier or TelegramNotifier()
+        self._cycle_lock = asyncio.Lock()
+
+    @property
+    def is_scraping(self) -> bool:
+        """Bir tarama döngüsünün çalışıp çalışmadığını döner."""
+        return self._cycle_lock.locked()
 
     async def run_full_cycle(self) -> Tuple[int, List[ScraperRunStatus]]:
-        """Tüm portalları tarar, puan eşleştirmesi yapar, yeni olanları kaydeder ve bildirir."""
+        """Tüm portalları tarar, puan eşleştirmesi yapar, yeni olanları kaydeder ve bildirir.
+
+        Aynı anda yalnızca bir döngü çalışabilir; çakışma durumunda ScrapeInProgressException fırlatır.
+        """
+        if self._cycle_lock.locked():
+            raise ScrapeInProgressException(ErrorStrings.SCRAPE_ALREADY_RUNNING)
+        async with self._cycle_lock:
+            return await self._run_full_cycle_locked()
+
+    async def _run_full_cycle_locked(self) -> Tuple[int, List[ScraperRunStatus]]:
         logger.info("Tam tarama ve bildirim döngüsü başlatılıyor...")
         results = await self.orchestrator.run_all()
 
@@ -46,6 +64,13 @@ class AnnouncementService:
             new_for_portal = 0
 
             for dto in created_dtos:
+                # 0. Güvenlik: yalnızca http/https adresli ilanlar kabul edilir (javascript: vb. reddedilir)
+                if not is_http_url(dto.url):
+                    logger.warning(f"Geçersiz URL nedeniyle ilan atlandı [{portal_key}]: {dto.url!r}")
+                    continue
+                if dto.pdf_url and not is_http_url(dto.pdf_url):
+                    dto.pdf_url = None
+
                 # 1. KPSS Puanı ve Öncelik Tespiti
                 scores, priority = KPSSScoreMatcher.match(
                     title=dto.title,

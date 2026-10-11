@@ -2,13 +2,13 @@
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, ClassVar, Dict, List, Optional
+
 import httpx
 
 from app.core.constants.settings import NetworkConstants
 from app.core.exceptions.scraper import (
     NetworkScraperException,
-    ParsingScraperException,
     RateLimitScraperException,
 )
 from app.core.logging import ScraperLoggerAdapter, get_scraper_logger
@@ -20,6 +20,9 @@ class BaseScraper(ABC):
 
     portal_key: str
     portal_name: str
+    # TLS sertifikası doğrulaması varsayılan olarak açıktır; yalnızca sertifika zinciri
+    # bozuk bir portal için alt sınıfta bilinçli olarak kapatılabilir.
+    verify_ssl: ClassVar[bool] = True
 
     def __init__(self) -> None:
         self.logger: ScraperLoggerAdapter = get_scraper_logger(self.portal_key)
@@ -39,16 +42,17 @@ class BaseScraper(ABC):
         form_data: Optional[Dict[str, Any]] = None,
         timeout: float = NetworkConstants.TOTAL_TIMEOUT_SECONDS,
         retries: int = NetworkConstants.MAX_RETRIES,
-        verify_ssl: bool = False,
+        verify_ssl: Optional[bool] = None,
     ) -> httpx.Response:
         """Hata yönetimi ve yeniden deneme (retry/backoff) içeren güvenli HTTP istemcisi."""
         req_headers = headers or NetworkConstants.DEFAULT_HEADERS.copy()
+        verify = self.verify_ssl if verify_ssl is None else verify_ssl
         last_exception: Optional[Exception] = None
 
         for attempt in range(1, retries + 1):
             try:
                 async with httpx.AsyncClient(
-                    verify=verify_ssl,
+                    verify=verify,
                     timeout=httpx.Timeout(timeout),
                     follow_redirects=True,
                 ) as client:

@@ -1,6 +1,7 @@
 """KPSS Atama Takip - Asenkron Telegram Bildirim Servisi."""
 
 from typing import Optional
+
 import httpx
 
 from app.config import settings
@@ -8,7 +9,8 @@ from app.core.constants.icons import PortalIcons, ScoreIcons
 from app.core.constants.strings import MessageStrings, NotificationStrings
 from app.core.exceptions.notification import TelegramDeliveryException
 from app.core.logging import get_logger
-from app.domain.models import Announcement, ScoreType
+from app.core.security import escape_html, is_http_url
+from app.domain.models import Announcement
 from app.infrastructure.notification.base import BaseNotifier
 
 logger = get_logger("notification.telegram")
@@ -36,10 +38,15 @@ class TelegramNotifier(BaseNotifier):
         """Bot token ve Chat ID tanımlı mı kontrol eder."""
         return bool(self.bot_token and self.chat_id)
 
+    def _redact(self, text: object) -> str:
+        """Log ve hata metinlerinden bot token'ını temizler (token URL içinde taşınır)."""
+        value = str(text)
+        return value.replace(self.bot_token, "***") if self.bot_token else value
+
     def _format_announcement_message(self, item: Announcement) -> str:
         """İlan için zengin HTML Telegram mesaj metni üretir."""
         # Puan türü formatlama
-        scores_str = ", ".join(s.value for s in item.matched_score_types) or "Genel"
+        scores_str = escape_html(", ".join(s.value for s in item.matched_score_types) or "Genel")
         if item.has_p3_score:
             score_badge = f"[{scores_str} - Lisans] (Öncelikli {ScoreIcons.P3_PRIORITY})"
         elif item.has_career_score:
@@ -50,26 +57,29 @@ class TelegramNotifier(BaseNotifier):
         lines = [
             NotificationStrings.HEADER,
             "",
-            NotificationStrings.INSTITUTION.format(institution=item.institution),
-            NotificationStrings.POSITION.format(position=item.title),
+            NotificationStrings.INSTITUTION.format(institution=escape_html(item.institution)),
+            NotificationStrings.POSITION.format(position=escape_html(item.title)),
             NotificationStrings.SCORE_TYPE.format(score_type=score_badge),
         ]
 
         if item.deadline_date:
-            lines.append(NotificationStrings.DEADLINE.format(deadline=item.deadline_date))
+            lines.append(NotificationStrings.DEADLINE.format(deadline=escape_html(item.deadline_date)))
 
         portal_icon = PortalIcons.get_for_portal(item.source_key)
         lines.append(
-            NotificationStrings.SOURCE.format(source=f"{portal_icon} {item.source_name}")
+            NotificationStrings.SOURCE.format(
+                source=f"{portal_icon} {escape_html(item.source_name)}"
+            )
         )
         lines.append("")
         if item.source_key == "kamu_ilan_sbb":
             lines.append("🏛️ <b>Resmi Portal:</b> https://kamuilan.sbb.gov.tr/")
             lines.append("<i>ℹ️ Not: SBB doğrudan dış bağlantı erişimini engellemektedir. İlan PDF belgesine web dashboard üzerinden veya SBB ana sayfasından erişebilirsiniz.</i>")
         else:
-            lines.append(NotificationStrings.LINK.format(url=item.url))
-            if item.pdf_url and item.pdf_url != item.url:
-                lines.append(NotificationStrings.PDF_LINK.format(pdf_url=item.pdf_url))
+            if is_http_url(item.url):
+                lines.append(NotificationStrings.LINK.format(url=escape_html(item.url)))
+            if item.pdf_url and item.pdf_url != item.url and is_http_url(item.pdf_url):
+                lines.append(NotificationStrings.PDF_LINK.format(pdf_url=escape_html(item.pdf_url)))
 
         return "\n".join(lines)
 
@@ -99,13 +109,15 @@ class TelegramNotifier(BaseNotifier):
                     return True
 
                 error_data = response.text
-                logger.error(f"Telegram API hatası ({response.status_code}): {error_data}")
+                logger.error(
+                    f"Telegram API hatası ({response.status_code}): {self._redact(error_data)}"
+                )
                 raise TelegramDeliveryException(
-                    original_error=error_data, chat_id=self.chat_id
+                    original_error=self._redact(error_data), chat_id=self.chat_id
                 )
 
         except Exception as e:
-            logger.error(f"Telegram bildirimi gönderilemedi: {e}")
+            logger.error(f"Telegram bildirimi gönderilemedi: {self._redact(e)}")
             return False
 
     async def test_connection(self) -> bool:
@@ -131,5 +143,6 @@ class TelegramNotifier(BaseNotifier):
                     },
                 )
                 return resp.status_code == 200
-        except Exception:
+        except Exception as e:
+            logger.error(f"Telegram test mesajı gönderilemedi: {self._redact(e)}")
             return False

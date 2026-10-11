@@ -1,6 +1,7 @@
 """KPSS Atama Takip - Kazıyıcı (Scraper) Katmanı İstisnaları."""
 
 from typing import Any, Dict, Optional
+
 from app.core.exceptions.base import KPSSBaseException
 
 
@@ -71,3 +72,10 @@ class RateLimitScraperException(ScraperException):
             details={"retry_after_seconds": retry_after},
         )
         self.retry_after = retry_after
+
+
+class ScrapeInProgressException(KPSSBaseException):
+    """Bir tarama döngüsü zaten çalışırken yenisi başlatılmaya çalışıldığında fırlatılır."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message=message, error_code="SCRAPE_IN_PROGRESS")

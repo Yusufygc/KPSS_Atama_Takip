@@ -49,6 +49,13 @@ class ErrorStrings:
     DUPLICATE_RECORD = "İlan veritabanında zaten mevcut: {hash_id}"
     NOTIFICATION_FAILED = "Telegram bildirimi gönderilemedi: {details}"
     VALIDATION_ERROR = "Veri doğrulama hatası: {field} - {issue}"
+    API_KEY_INVALID = "Geçersiz veya eksik API anahtarı."
+    API_KEY_NOT_CONFIGURED = "Prodüksiyonda API_KEY tanımlanmadan yönetim uç noktaları kullanılamaz."
+    SCRAPE_ALREADY_RUNNING = "Bir tarama zaten çalışıyor, lütfen bitmesini bekleyin."
+    DOCUMENT_HOST_NOT_ALLOWED = "Belge adresi izin verilen kaynaklar arasında değil."
+    DOCUMENT_TOO_LARGE = "İlan belgesi izin verilen boyut sınırını aşıyor."
+    BROWSER_NOT_FOUND = "Headless tarayıcı (Chrome/Edge/Chromium) bulunamadı."
+    BROWSER_TIMEOUT = "Headless tarayıcı zaman aşımına uğradı."
 
 
 class NotificationStrings:

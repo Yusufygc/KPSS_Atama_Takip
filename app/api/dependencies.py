@@ -1,6 +1,7 @@
 """KPSS Atama Takip - FastAPI Bağımlılık Enjeksiyonu (Dependency Injection)."""
 
 from typing import Annotated
+
 from fastapi import Depends
 
 from app.infrastructure.database.repository import AnnouncementRepository

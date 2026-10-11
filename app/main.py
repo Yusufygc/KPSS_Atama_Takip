@@ -1,12 +1,16 @@
 """KPSS Atama Takip - FastAPI Ana Uygulama Fabrikası ve Giriş Noktası."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import announcements_router, scrapers_router, settings_router
 from app.config import settings
+from app.core.constants.settings import SecurityConstants
 from app.core.exceptions.base import KPSSBaseException
 from app.core.logging import get_logger, setup_root_logger
 from app.infrastructure.database.connection import init_database
@@ -40,21 +44,42 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """FastAPI uygulamasını yapılandırır ve döner."""
+    # Prodüksiyonda otomatik API dokümantasyonu kapalıdır
+    docs_enabled = not settings.is_production
     app = FastAPI(
         title=settings.APP_NAME,
         version="1.0.0",
         description="6 Kamu Portalı için KPSS Atama ve Personel Alım Takip API'si",
         lifespan=lifespan,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
     )
 
-    # CORS İzinleri (Web UI için)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # CORS: Web UI aynı origin'den sunulur; yalnızca açıkça listelenen kaynaklara izin verilir
+    cors_origins = settings.cors_origin_list
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=False,
+            allow_methods=["GET", "POST"],
+            allow_headers=["Content-Type", "X-API-Key"],
+        )
+
+    @app.middleware("http")
+    async def security_headers_middleware(request: Request, call_next):
+        """Tüm yanıtlara güvenlik başlıklarını ekler."""
+        response = await call_next(request)
+        for header, value in SecurityConstants.RESPONSE_HEADERS.items():
+            response.headers.setdefault(header, value)
+        # PDF görüntüleyici ve Swagger arayüzü CSP kısıtlarından etkilenmesin
+        path = request.url.path
+        if not (path.endswith("/document") or path in SecurityConstants.CSP_EXEMPT_PATHS):
+            response.headers.setdefault(
+                "Content-Security-Policy", SecurityConstants.CONTENT_SECURITY_POLICY
+            )
+        return response
 
     # Global Hata İşleyici (Domain Exceptions)
     @app.exception_handler(KPSSBaseException)
@@ -73,16 +98,9 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["Sağlık"])
     async def health_check():
         """Sistem sağlık kontrolü uç noktası."""
-        return {
-            "status": "healthy",
-            "app_name": settings.APP_NAME,
-            "env": settings.APP_ENV,
-        }
+        return {"status": "healthy"}
 
     # Web Dashboard (Statik Dosyalar)
-    from pathlib import Path
-    from fastapi.staticfiles import StaticFiles
-
     web_dir = Path(__file__).resolve().parent.parent / "web"
     if web_dir.exists():
         app.mount("/", StaticFiles(directory=str(web_dir), html=True), name="web")

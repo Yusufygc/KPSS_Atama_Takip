@@ -76,6 +76,43 @@ const el = {
     toastContainer: document.getElementById('toastContainer')
 };
 
+// Güvenlik Yardımcıları: kazınan veriler asla ham HTML olarak basılmaz
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
+// Yalnızca http(s) adreslerine izin verir (javascript: vb. şemaları '#' yapar)
+function safeUrl(value) {
+    try {
+        const parsed = new URL(value, window.location.origin);
+        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : '#';
+    } catch (_) {
+        return '#';
+    }
+}
+
+// Yönetim uç noktaları için X-API-Key başlığı ekleyen fetch sarmalayıcısı
+const API_KEY_STORAGE = 'kpss_api_key';
+
+async function apiFetch(url, options = {}, allowPrompt = true) {
+    const headers = new Headers(options.headers || {});
+    const savedKey = sessionStorage.getItem(API_KEY_STORAGE);
+    if (savedKey) headers.set('X-API-Key', savedKey);
+
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401 && allowPrompt) {
+        const entered = window.prompt('Bu işlem için API anahtarını girin:');
+        if (entered) {
+            sessionStorage.setItem(API_KEY_STORAGE, entered.trim());
+            return apiFetch(url, options, false);
+        }
+        sessionStorage.removeItem(API_KEY_STORAGE);
+    }
+    return res;
+}
+
 // 0. Tema Yönetimi (Dark / Light Mode)
 function applyTheme(theme) {
     state.theme = theme;
@@ -109,7 +146,12 @@ function showToast(message, type = 'info') {
         : (type === 'error' ? SVG_ICONS.alertCircle : SVG_ICONS.info);
 
     toast.className = `toast pointer-events-auto flex items-center space-x-2.5 px-4 py-3 rounded-xl shadow-lg text-xs font-semibold ${bgClass}`;
-    toast.innerHTML = `<span class="shrink-0">${iconSvg}</span><span>${message}</span>`;
+    const iconWrap = document.createElement('span');
+    iconWrap.className = 'shrink-0';
+    iconWrap.innerHTML = iconSvg;
+    const textWrap = document.createElement('span');
+    textWrap.textContent = message;
+    toast.append(iconWrap, textWrap);
     
     el.toastContainer.appendChild(toast);
     setTimeout(() => {
@@ -203,7 +245,7 @@ async function fetchAnnouncements() {
     } catch (err) {
         el.announcementsContainer.innerHTML = `
             <div class="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-2xl p-6 text-center text-rose-700 dark:text-rose-300 text-xs">
-                İlanlar getirilirken bir hata oluştu: ${err.message}
+                İlanlar getirilirken bir hata oluştu: ${escapeHtml(err.message)}
             </div>
         `;
     }
@@ -246,7 +288,7 @@ function renderAnnouncements(items) {
 
         // Alt Uzmanlık Etiketleri
         const fieldTagsHtml = (item.field_tags || []).map(tag => {
-            return `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-cyan-50 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/60">${tag}</span>`;
+            return `<span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-cyan-50 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800/60">${escapeHtml(tag)}</span>`;
         }).join(' ');
 
         // Puan Rozetleri
@@ -259,7 +301,7 @@ function renderAnnouncements(items) {
             } else if (score === 'P1' || score === 'P2') {
                 return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 space-x-1.5">
                     ${SVG_ICONS.award}
-                    <span>KPSS ${score} Kariyer</span>
+                    <span>KPSS ${escapeHtml(score)} Kariyer</span>
                 </span>`;
             } else {
                 return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 space-x-1">
@@ -273,7 +315,7 @@ function renderAnnouncements(items) {
         const deadlineBadge = item.deadline_date ? `
             <div class="flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg space-x-1.5">
                 ${SVG_ICONS.calendar}
-                <span>Son Başvuru: ${item.deadline_date}</span>
+                <span>Son Başvuru: ${escapeHtml(item.deadline_date)}</span>
             </div>
         ` : '';
 
@@ -281,13 +323,13 @@ function renderAnnouncements(items) {
         const cityBadge = item.city ? `
             <span class="inline-flex items-center text-xs text-slate-600 dark:text-slate-400 font-medium space-x-1">
                 ${SVG_ICONS.mapPin}
-                <span>${item.city}</span>
+                <span>${escapeHtml(item.city)}</span>
             </span>
         ` : '';
 
         // PDF Belge Butonu
         const pdfButton = item.document_url ? `
-            <a href="${item.document_url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Resmi Belgeyi (PDF) Aç">
+            <a href="${escapeHtml(safeUrl(item.document_url))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Resmi Belgeyi (PDF) Aç">
                 ${SVG_ICONS.fileText}
                 <span>PDF</span>
             </a>
@@ -296,13 +338,13 @@ function renderAnnouncements(items) {
         // Aksiyon Butonları
         let actionButtons = '';
         if (item.source_key === 'kamu_ilan_sbb') {
-            const docUrl = item.document_url || `/api/announcements/${item.id}/document`;
+            const docUrl = safeUrl(item.document_url || `/api/announcements/${encodeURIComponent(item.id)}/document`);
             actionButtons = `
                 <a href="https://kamuilan.sbb.gov.tr/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors" title="Kamu İlan Ana Sayfası">
                     ${SVG_ICONS.building}
                     <span>SBB Portalı</span>
                 </a>
-                <a href="${docUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-all active:scale-95" title="Resmi İlan Metnini (PDF) Aç">
+                <a href="${escapeHtml(docUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-all active:scale-95" title="Resmi İlan Metnini (PDF) Aç">
                     ${SVG_ICONS.fileText}
                     <span>İlan Metni (PDF)</span>
                     ${SVG_ICONS.arrowRight}
@@ -311,7 +353,7 @@ function renderAnnouncements(items) {
         } else {
             actionButtons = `
                 ${pdfButton}
-                <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-all active:scale-95">
+                <a href="${escapeHtml(safeUrl(item.url))}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-all active:scale-95">
                     <span>İlana Git</span>
                     ${SVG_ICONS.arrowRight}
                 </a>
@@ -326,7 +368,7 @@ function renderAnnouncements(items) {
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="inline-flex items-center text-xs font-semibold text-slate-500 dark:text-slate-400 space-x-1.5">
                                 <span class="shrink-0">${portalIconSvg}</span>
-                                <span>${item.source_name}</span>
+                                <span>${escapeHtml(item.source_name)}</span>
                             </span>
                             ${itBadge}
                             ${scoreBadges}
@@ -336,10 +378,10 @@ function renderAnnouncements(items) {
                         <!-- Kurum & Başlık -->
                         <div>
                             <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">
-                                ${item.institution}
+                                ${escapeHtml(item.institution)}
                             </h3>
                             <h2 class="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug">
-                                ${item.title}
+                                ${escapeHtml(item.title)}
                             </h2>
                         </div>
 
@@ -389,7 +431,7 @@ async function fetchScraperStatuses() {
             const isSuccess = s.status === 'success';
             const isError = s.status === 'error';
             const statusDot = isSuccess ? 'bg-emerald-500' : (isError ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-600');
-            const statusText = isSuccess ? `${s.found_count} İlan` : (isError ? 'Hata' : 'Beklemede');
+            const statusText = isSuccess ? `${Number(s.found_count) || 0} İlan` : (isError ? 'Hata' : 'Beklemede');
             const portalIcon = getPortalSvg(s.portal_key);
 
             return `
@@ -397,12 +439,12 @@ async function fetchScraperStatuses() {
                     <div class="w-8 h-8 mx-auto rounded-lg bg-slate-200/60 dark:bg-slate-700/60 flex items-center justify-center text-slate-700 dark:text-slate-200">
                         ${portalIcon}
                     </div>
-                    <div class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate" title="${s.portal_name}">${s.portal_name}</div>
+                    <div class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate" title="${escapeHtml(s.portal_name)}">${escapeHtml(s.portal_name)}</div>
                     <div class="inline-flex items-center text-[10px] font-semibold text-slate-600 dark:text-slate-400">
                         <span class="w-1.5 h-1.5 rounded-full ${statusDot} mr-1.5"></span>
                         ${statusText}
                     </div>
-                    ${s.duration_ms > 0 ? `<div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono">${Math.round(s.duration_ms)} ms</div>` : ''}
+                    ${s.duration_ms > 0 ? `<div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono">${Math.round(Number(s.duration_ms) || 0)} ms</div>` : ''}
                 </div>
             `;
         }).join('');
@@ -423,10 +465,12 @@ async function triggerScrape() {
     showToast('Tüm kamu portalları taranıyor...', 'info');
 
     try {
-        const res = await fetch('/api/scrapers/run', { method: 'POST' });
-        const data = await res.json();
+        const res = await apiFetch('/api/scrapers/run', { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
 
-        if (data.success) {
+        if (!res.ok) {
+            showToast(data.detail || 'Tarama başlatılamadı.', 'error');
+        } else if (data.success) {
             showToast(`Tarama tamamlandı! ${data.new_announcements} yeni ilan eklendi.`, 'success');
             await fetchStats();
             await fetchCities();
@@ -448,11 +492,11 @@ async function triggerScrape() {
 // 6. Telegram Ayarları ve Testi
 async function loadSettings() {
     try {
-        const res = await fetch('/api/settings');
+        const res = await apiFetch('/api/settings');
         if (!res.ok) return;
         const data = await res.json();
 
-        el.inputChatId.value = data.telegram_chat_id || 'Tanımlanmamış';
+        el.inputChatId.value = data.telegram_chat_id_masked || 'Tanımlanmamış';
         
         if (data.telegram_configured) {
             el.tgStatusBadge.className = 'flex items-center space-x-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
@@ -473,8 +517,9 @@ async function testTelegram() {
     el.telegramTestFeedback.classList.remove('hidden');
 
     try {
-        const res = await fetch('/api/settings/telegram/test', { method: 'POST' });
-        const data = await res.json();
+        const res = await apiFetch('/api/settings/telegram/test', { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) data.message = data.detail || 'İstek reddedildi.';
 
         if (data.success) {
             el.telegramTestFeedback.className = 'text-xs text-center mt-2 text-emerald-600 dark:text-emerald-400 font-semibold';
