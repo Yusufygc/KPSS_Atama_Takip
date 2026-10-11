@@ -55,3 +55,10 @@ Her scraper adaptörü kendi try-catch bloğu içinde çalışır. Eğer bir sit
 3. Hata durumu merkezi sağlık durumuna (Healthcheck DTO) yansıtılır.
 
 Bağlantılar: [[rules]], [[architecture]], [[log]]
+
+
+## Güncel Kazıma Notları (2026-10-12)
+* **Kariyer Kapısı:** Detay bağlantısı `https://kariyerkapisi.gov.tr/IlanDetay?i=<guid>` biçimindedir. `/isealim/IlanDetay` portalın WAF'ında 406 ile engellenir.
+* **İŞKUR:** Sonuç tablosu sabit kimlik son ekli span'lerden okunur (`ctlIsverenDL`, `ctlCalismaYeriDL`, `ctlSonBasvuruTarihi`, `Label9`). Sayfalama `btnNext` postback'iyle tüm sayfalar için yapılır; her ilan `AcikIsIlanDetay.aspx?uiID=<no>&isyeriTuru=Kamu` ile benzersiz URL alır.
+* **Kamu İlan (SBB):** `ilanDetay.aspx?kod=` değeri her istekte değişen şifreli bir değerdir (eski değerler çalışmaya devam eder). Bu yüzden ilan kimliği URL'den değil `başlık + son tarih`ten üretilir (`stable_url=False`).
+* **İlan.gov.tr:** Chrome/Edge/Chromium bulunamazsa kazıyıcı hata durumuna geçer (sessiz boş liste dönmez). Yol `BROWSER_EXECUTABLE_PATH` ile verilebilir.

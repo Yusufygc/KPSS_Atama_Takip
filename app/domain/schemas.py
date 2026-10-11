@@ -22,6 +22,8 @@ class AnnouncementCreate(BaseModel):
     publish_date: Optional[str] = None
     deadline_date: Optional[str] = None
     raw_content: Optional[str] = None
+    # False: portal her istekte farklı URL üretiyor; tekilleştirme URL yerine başlık+son tarihle yapılır
+    stable_url: bool = True
 
 
 class AnnouncementResponse(BaseModel):

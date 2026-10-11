@@ -61,6 +61,8 @@ class KamuIlanSbbScraper(BaseScraper):
                     url=full_url,
                     deadline_date=deadline_str or None,
                     raw_content=f"{title} (Son Başvuru: {deadline_str})",
+                    # ilanDetay.aspx?kod=... şifreli değeri her istekte değişir; tekilleştirme başlık+tarihle yapılır
+                    stable_url=False,
                 )
             )
 

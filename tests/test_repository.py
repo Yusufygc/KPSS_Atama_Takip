@@ -215,3 +215,38 @@ async def test_init_database_removes_legacy_iskur_rows(db_ready):
     await init_database()
     _, total = await repo.list_announcements(AnnouncementFilterParams())
     assert total == 2
+
+
+def test_hash_ignores_url_only_when_stable_url_is_false():
+    from app.domain.models import compute_announcement_hash as h
+
+    args = ("kamu_ilan_sbb", "Başlık", "https://x.test/a?kod=1", "12 Ekim - 26 Ekim")
+    assert h(*args) != h(*("kamu_ilan_sbb", "Başlık", "https://x.test/a?kod=2", "12 Ekim - 26 Ekim"))
+    assert h(*args, stable_url=False) == h(
+        "kamu_ilan_sbb", "Başlık", "https://x.test/a?kod=2", "12 Ekim - 26 Ekim", stable_url=False
+    )
+    assert h(*args, stable_url=False) != h(*args)
+
+
+async def test_init_database_rehashes_sbb_rows_and_drops_duplicates(db_ready):
+    from app.infrastructure.database.connection import init_database
+
+    repo = AnnouncementRepository()
+    # Eski hash'li (URL'ye bağlı) kayıtlar: aynı ilan farklı kod değerleriyle iki kez eklenmiş
+    for kod in ("AAA", "BBB"):
+        await repo.save(make("SBB ilanı", [ScoreType.P3], source_key="kamu_ilan_sbb", url=f"https://kamuilan.sbb.gov.tr/d?kod={kod}", deadline_date="1 Ekim"))
+    other = make("Başka kaynak", [ScoreType.P3], url="https://example.test/ayni")
+    await repo.save(other)
+
+    await init_database()
+
+    items, total = await repo.list_announcements(AnnouncementFilterParams())
+    assert total == 2, "SBB mükerrerlerinden biri silinmeli, diğer kaynaklara dokunulmamalı"
+    assert (await repo.exists_by_hash(other.hash_id)) is True
+
+    # Aynı ilan yeni bir kod ile gelirse artık mükerrer sayılmalı
+    again = make(
+        "SBB ilanı", [ScoreType.P3], source_key="kamu_ilan_sbb", url="https://kamuilan.sbb.gov.tr/d?kod=CCC",
+        deadline_date="1 Ekim", stable_url=False,
+    )
+    assert await repo.save(again) is None

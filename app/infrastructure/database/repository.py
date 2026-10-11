@@ -1,7 +1,7 @@
 """KPSS Atama Takip - İlan Veritabanı Deposu (Repository Pattern)."""
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -230,16 +230,34 @@ class AnnouncementRepository:
 
         return items, total_count
 
-    async def get_unnotified_announcements(self, limit: int = 50) -> List[Announcement]:
-        """Henüz Telegram ile bildirilmemiş ilanları döner."""
-        sql = """
-        SELECT * FROM announcements
-        WHERE is_notified = 0
-        ORDER BY priority_level DESC, id ASC
-        LIMIT ?;
-        """
+    async def count_all(self) -> int:
+        """Toplam ilan sayısını döner."""
         async with get_db_connection(self.db_path) as conn:
-            async with conn.execute(sql, (limit,)) as cursor:
+            async with conn.execute("SELECT COUNT(*) FROM announcements;") as cursor:
+                return (await cursor.fetchone())[0] or 0
+
+    async def get_unnotified_announcements(
+        self,
+        limit: int = 50,
+        since_hours: Optional[int] = None,
+    ) -> List[Announcement]:
+        """Henüz Telegram ile bildirilmemiş ilanları (öncelik sırasıyla) döner.
+
+        since_hours verilirse yalnızca son N saatte eklenen ilanlar döner; böylece eski
+        bildirilmemiş kayıtlar yeniden deneme sırasında toplu mesaj yağmuruna yol açmaz.
+        """
+        conditions = ["is_notified = 0"]
+        params: List[Any] = []
+        if since_hours is not None:
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+            conditions.append("created_at >= ?")
+            params.append(cutoff.isoformat())
+        sql = (
+            f"SELECT * FROM announcements WHERE {' AND '.join(conditions)} "  # noqa: S608  # nosec B608
+            "ORDER BY priority_level DESC, id ASC LIMIT ?;"
+        )
+        async with get_db_connection(self.db_path) as conn:
+            async with conn.execute(sql, [*params, limit]) as cursor:
                 rows = await cursor.fetchall()
                 return [self._row_to_entity(r) for r in rows]
 

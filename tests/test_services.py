@@ -97,3 +97,16 @@ async def test_cycle_rejects_overlapping_runs(db_ready):
     gate.set()
     await running
     assert not service.is_scraping
+
+
+async def test_cycle_does_not_duplicate_items_whose_url_changes_every_scrape(db_ready):
+    """SBB'nin kod parametresi her istekte değişir; aynı ilan tekrar eklenmemeli."""
+    orchestrator = FakeOrchestrator([dto(title="Aynı ilan", url="https://kamuilan.sbb.gov.tr/d?kod=1", stable_url=False)])
+    service = AnnouncementService(
+        repository=AnnouncementRepository(), orchestrator=orchestrator, notifier=TelegramNotifier(is_enabled=False)
+    )
+    assert (await service.run_full_cycle())[0] == 1
+
+    orchestrator.dtos = [dto(title="Aynı ilan", url="https://kamuilan.sbb.gov.tr/d?kod=2", stable_url=False)]
+    assert (await service.run_full_cycle())[0] == 0
+    assert (await service.repository.count_all()) == 1

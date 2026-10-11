@@ -16,6 +16,11 @@ class BaseNotifier(ABC):
         pass
 
     @abstractmethod
+    async def send_text(self, text: str) -> bool:
+        """Serbest metin (özet/duyuru) gönderir. Başarılıysa True döner."""
+        pass
+
+    @abstractmethod
     async def test_connection(self) -> bool:
         """Bildirim kanalının bağlantısını ve ayarlarını test eder."""
         pass

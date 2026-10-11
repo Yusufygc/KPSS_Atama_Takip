@@ -32,6 +32,14 @@ class AppSettings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
     TELEGRAM_NOTIFICATIONS_ENABLED: bool = False
+    # Boş veritabanında ilk taramada bulunan mevcut ilanlar için bildirim gönderilsin mi (varsayılan: hayır)
+    NOTIFY_ON_FIRST_RUN: bool = False
+    # Tek taramada tek tek gönderilecek en fazla bildirim; fazlası tek özet mesajıyla bildirilir
+    TELEGRAM_MAX_PER_CYCLE: int = 15
+    # Mesajlar arası bekleme (Telegram aynı sohbete saniyede ~1 mesaj önerir)
+    TELEGRAM_SEND_INTERVAL_SECONDS: float = 1.1
+    # Gönderilemeyen bildirimler yalnızca bu kadar saat içinde yeniden denenir (eski ilanlar yağmuru olmasın)
+    TELEGRAM_RETRY_WINDOW_HOURS: int = 24
 
     # Kazıma & Zamanlama Parametreleri
     SCRAPER_INTERVAL_MINUTES: int = 15

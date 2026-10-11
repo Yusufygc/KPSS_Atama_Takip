@@ -82,3 +82,13 @@ class SecurityConstants:
         "Referrer-Policy": "no-referrer",
         "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
     }
+
+
+class TelegramConstants:
+    """Telegram Bot API gönderim sınırları."""
+
+    MAX_MESSAGE_LENGTH = 4096
+    REQUEST_TIMEOUT_SECONDS = 10.0
+    MAX_SEND_ATTEMPTS = 3
+    MAX_RETRY_AFTER_SECONDS = 30
+    MAX_CONSECUTIVE_FAILURES = 2  # üst üste bu kadar hata olursa döngüdeki gönderim bırakılır

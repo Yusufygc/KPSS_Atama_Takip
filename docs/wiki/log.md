@@ -4,6 +4,19 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-12] QA | QA Taraması Bulgularının Düzeltilmesi
+* **SBB mükerrer ilan hatası (kritik):** `kod` URL parametresi her istekte değiştiği için hash URL'ye bağlıyken her taramada ~128 SBB ilanı "yeni" ekleniyordu. Kimlik artık başlık+son tarihten üretiliyor (`stable_url=False`); eski kayıtlar açılışta yeniden hash'lenip mükerrerler siliniyor.
+* **Arama / etiket:** `search_text` ile Türkçe harf duyarsız arama; `field_tags` gerçek Türkçe karakterle saklanıyor, eski kaçışlı kayıtlar onarılıyor.
+* **DB hata yönetimi:** Gövde hataları artık "bağlantı kurulamadı" diye sarılmıyor; alan istisnaları `http_status` taşıyor (5xx'te ayrıntı sızmıyor).
+* **Tek servis örneği:** Zamanlayıcı ve API aynı `AnnouncementService`'i paylaşıyor (kilit ve portal durumları ortak).
+* **P3 puanlaması:** Kelime başı eşleşme, akademik/işçi ilanları hariç, `KPSS-P3`/`KPSS (P3)` yazımları; `SCORING_VERSION` ile mevcut kayıtlar yeniden puanlanıyor.
+* **İŞKUR:** Kazıyıcı sıfırdan yazıldı (alan bazlı ayrıştırma, tüm sayfalar, benzersiz URL).
+* **Bildirimler:** İlk çalıştırma tabanı, döngü başı üst sınır + özet mesajı, 429 yönetimi, 24 saat içinde yeniden deneme.
+* **Kariyer Kapısı:** Detay bağlantısı `/IlanDetay?i=` olarak düzeltildi (`/isealim/IlanDetay` 406 veriyordu).
+* Bağlantılar: [[notifications]], [[scrapers]], [[kpss_scoring]]
+
+---
+
 ## [2026-10-12] SECURITY & QUALITY | Güvenlik Sertleştirmesi, Puanlama Hatası ve Test Altyapısı
 * **XSS:** Arayüzde kazınan veriler `escapeHtml`/`safeUrl` ile basılıyor; `javascript:` adresleri sunucuda reddediliyor.
 * **Puanlama hatası:** `str.upper()` Türkçe `i` harfini `I` yaptığı için "Bilgisayar mühendisi" gibi küçük harfli başlıklar P3 olarak eşleşmiyordu. Ortak `turkish_upper` (`app/core/text.py`) eklendi ve üç eşleştiricide kullanıldı.

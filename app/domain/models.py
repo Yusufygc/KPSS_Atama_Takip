@@ -31,9 +31,16 @@ def compute_announcement_hash(
     title: str,
     url: str,
     deadline_date: Optional[str] = None,
+    stable_url: bool = True,
 ) -> str:
-    """İlan için deterministik SHA-256 parmak izi üretir (Mükerrer önleme)."""
-    raw_payload = f"{source_key.strip().lower()}|{title.strip().lower()}|{url.strip().lower()}|{(deadline_date or '').strip()}"
+    """İlan için deterministik SHA-256 parmak izi üretir (Mükerrer önleme).
+
+    stable_url=False ise URL hash'e katılmaz: bazı portallar (örn. Kamu İlan SBB) her istekte
+    farklı şifreli bir bağlantı üretir; URL'ye bağlı hash her taramada aynı ilanı "yeni" gösterirdi.
+    Bu durumda kimlik kaynak + başlık + son tarihten oluşur.
+    """
+    url_part = url.strip().lower() if stable_url else ""
+    raw_payload = f"{source_key.strip().lower()}|{title.strip().lower()}|{url_part}|{(deadline_date or '').strip()}"
     return hashlib.sha256(raw_payload.encode("utf-8")).hexdigest()
 
 
@@ -53,6 +60,8 @@ class Announcement:
     url: str
     hash_id: str = ""
     id: Optional[int] = None
+    # False: URL her istekte değişen portallar için hash URL'siz hesaplanır
+    stable_url: bool = True
     position: Optional[str] = None
     city: Optional[str] = None
     pdf_url: Optional[str] = None
@@ -76,6 +85,7 @@ class Announcement:
                 title=self.title,
                 url=self.url,
                 deadline_date=self.deadline_date,
+                stable_url=self.stable_url,
             )
 
     @property

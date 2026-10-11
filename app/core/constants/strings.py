@@ -36,6 +36,9 @@ class MessageStrings:
     ANNOUNCEMENT_SAVED = "Yeni ilan kaydedildi: [{portal}] {title}"
     NOTIFICATION_SENT = "Telegram bildirimi iletildi: {title}"
     TELEGRAM_DISABLED = "Telegram bildirimleri pasif durumda veya token girilmemiş."
+    NOTIFY_BASELINE = "İlk çalıştırma: {count} mevcut ilan bildirim gönderilmeden işaretlendi."
+    NOTIFY_SUMMARY = "Bildirim: {sent} ilan tek tek, {summarized} ilan özet olarak iletildi."
+    NOTIFY_ABORTED = "Telegram art arda hata verdi, kalan bildirimler sonraki taramaya bırakıldı."
 
 
 class ErrorStrings:
@@ -69,3 +72,17 @@ class NotificationStrings:
     SOURCE = "🌐 <b>Kaynak:</b> {source}"
     LINK = '🔗 <a href="{url}">İlanı Görüntüle ve Başvur</a>'
     PDF_LINK = '📄 <a href="{pdf_url}">Resmî Gazete / İlan PDF</a>'
+    SBB_PORTAL_LINE = "🏛️ <b>Resmi Portal:</b> https://kamuilan.sbb.gov.tr/"
+    SBB_PORTAL_NOTE = (
+        "<i>ℹ️ Not: SBB doğrudan dış bağlantı erişimini engellemektedir. "
+        "İlan PDF belgesine web dashboard üzerinden veya SBB ana sayfasından erişebilirsiniz.</i>"
+    )
+    TEST_MESSAGE = (
+        "🔔 <b>KPSS Atama Takip Sistemi</b>\n\n"
+        "✅ Telegram bildirim bağlantısı başarıyla kuruldu!\n"
+        "Yeni bir atama veya personel alım ilanı yayınlandığında anında buradan haberdar edileceksiniz."
+    )
+    SUMMARY = (
+        "📬 <b>{count} ilan daha eklendi.</b>\n"
+        "Hepsini web panelinden inceleyebilirsiniz (öncelikli ilanlar yukarıda gönderildi)."
+    )

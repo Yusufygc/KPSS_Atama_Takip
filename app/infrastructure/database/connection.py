@@ -200,6 +200,37 @@ async def _remove_legacy_iskur_rows(conn: aiosqlite.Connection) -> None:
         logger.info(f"{cursor.rowcount} eski İŞKUR kaydı temizlendi.")
 
 
+async def _rehash_unstable_url_sources(conn: aiosqlite.Connection) -> None:
+    """Kamu İlan (SBB) kayıtlarının hash_id değerini URL'siz biçimde yeniden hesaplar.
+
+    SBB bağlantıları her istekte değiştiğinden eski hash'ler hiçbir taramada eşleşmiyor ve tüm
+    ilanlar tekrar tekrar ekleniyordu. Aynı ilanın birden çok kopyası varsa ilki korunur.
+    """
+    async with conn.execute(
+        "SELECT id, source_key, title, url, deadline_date, hash_id FROM announcements "
+        "WHERE source_key = 'kamu_ilan_sbb' ORDER BY id ASC;"
+    ) as cursor:
+        rows = await cursor.fetchall()
+
+    updated = removed = 0
+    for row in rows:
+        new_hash = compute_announcement_hash(
+            row["source_key"], row["title"], row["url"], row["deadline_date"], stable_url=False
+        )
+        if new_hash == row["hash_id"]:
+            continue
+        cursor = await conn.execute(
+            "UPDATE OR IGNORE announcements SET hash_id = ? WHERE id = ?;", (new_hash, row["id"])
+        )
+        if cursor.rowcount:
+            updated += 1
+        else:
+            await conn.execute("DELETE FROM announcements WHERE id = ?;", (row["id"],))
+            removed += 1
+    if updated or removed:
+        logger.info(f"SBB hash düzeltmesi: {updated} güncellendi, {removed} mükerrer silindi.")
+
+
 async def init_database(custom_path: Optional[Path] = None) -> None:
     """Veritabanı tablolarını ve indekslerini başlatır."""
     async with get_db_connection(custom_path) as conn:
@@ -221,6 +252,7 @@ async def init_database(custom_path: Optional[Path] = None) -> None:
         await _backfill_search_text(conn)
         await _normalize_field_tags_encoding(conn)
         await _remove_legacy_iskur_rows(conn)
+        await _rehash_unstable_url_sources(conn)
         await _rescore_if_outdated(conn)
         await conn.commit()
         logger.info("Veritabanı şeması ve indeksleri başarıyla doğrulandı.")

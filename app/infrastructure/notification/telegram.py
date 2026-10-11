@@ -1,19 +1,24 @@
 """KPSS Atama Takip - Asenkron Telegram Bildirim Servisi."""
 
-from typing import Optional
+import asyncio
+import html
+import re
+from typing import Any, Dict, Optional
 
 import httpx
 
 from app.config import settings
 from app.core.constants.icons import PortalIcons, ScoreIcons
+from app.core.constants.settings import TelegramConstants
 from app.core.constants.strings import MessageStrings, NotificationStrings
-from app.core.exceptions.notification import TelegramDeliveryException
 from app.core.logging import get_logger
 from app.core.security import escape_html, is_http_url
 from app.domain.models import Announcement
 from app.infrastructure.notification.base import BaseNotifier
 
 logger = get_logger("notification.telegram")
+
+_TAG_RE = re.compile(r"<[^>]+>")
 
 
 class TelegramNotifier(BaseNotifier):
@@ -37,6 +42,11 @@ class TelegramNotifier(BaseNotifier):
     def is_configured(self) -> bool:
         """Bot token ve Chat ID tanımlı mı kontrol eder."""
         return bool(self.bot_token and self.chat_id)
+
+    @property
+    def is_ready(self) -> bool:
+        """Bildirim gönderilebilir durumda mı (açık ve yapılandırılmış)."""
+        return self.is_enabled and self.is_configured
 
     def _redact(self, text: object) -> str:
         """Log ve hata metinlerinden bot token'ını temizler (token URL içinde taşınır)."""
@@ -73,8 +83,8 @@ class TelegramNotifier(BaseNotifier):
         )
         lines.append("")
         if item.source_key == "kamu_ilan_sbb":
-            lines.append("🏛️ <b>Resmi Portal:</b> https://kamuilan.sbb.gov.tr/")
-            lines.append("<i>ℹ️ Not: SBB doğrudan dış bağlantı erişimini engellemektedir. İlan PDF belgesine web dashboard üzerinden veya SBB ana sayfasından erişebilirsiniz.</i>")
+            lines.append(NotificationStrings.SBB_PORTAL_LINE)
+            lines.append(NotificationStrings.SBB_PORTAL_NOTE)
         else:
             if is_http_url(item.url):
                 lines.append(NotificationStrings.LINK.format(url=escape_html(item.url)))
@@ -83,66 +93,82 @@ class TelegramNotifier(BaseNotifier):
 
         return "\n".join(lines)
 
+    @staticmethod
+    def _error_body(response: httpx.Response) -> Dict[str, Any]:
+        """Telegram hata yanıtını sözlüğe çevirir (JSON değilse boş sözlük)."""
+        try:
+            body = response.json()
+            return body if isinstance(body, dict) else {}
+        except ValueError:
+            return {}
+
+    async def _post_message(self, text: str, parse_mode: Optional[str] = "HTML") -> bool:
+        """Mesajı gönderir; hız sınırında (429) bekleyip bir kez yeniden dener,
+        HTML ayrıştırma hatasında düz metne düşer. Başarılıysa True döner."""
+        url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+        text = text[: TelegramConstants.MAX_MESSAGE_LENGTH]
+        rate_limit_retried = False
+
+        for _ in range(TelegramConstants.MAX_SEND_ATTEMPTS):
+            payload: Dict[str, Any] = {"chat_id": self.chat_id, "text": text}
+            if parse_mode:
+                payload["parse_mode"] = parse_mode
+
+            try:
+                async with httpx.AsyncClient(timeout=TelegramConstants.REQUEST_TIMEOUT_SECONDS) as client:
+                    response = await client.post(url, json=payload)
+            except httpx.HTTPError as exc:
+                logger.error(f"Telegram bildirimi gönderilemedi: {self._redact(exc)}")
+                return False
+
+            if response.status_code == 200:
+                return True
+
+            body = self._error_body(response)
+            description = str(body.get("description", ""))
+
+            if response.status_code == 429 and not rate_limit_retried:
+                retry_after = int((body.get("parameters") or {}).get("retry_after", 1))
+                if retry_after > TelegramConstants.MAX_RETRY_AFTER_SECONDS:
+                    logger.error(f"Telegram hız sınırı çok uzun ({retry_after} sn), gönderim ertelendi.")
+                    return False
+                logger.warning(f"Telegram hız sınırı (429): {retry_after} sn bekleniyor...")
+                rate_limit_retried = True
+                await asyncio.sleep(retry_after + 0.5)
+                continue
+
+            if response.status_code == 400 and parse_mode and "parse entities" in description:
+                logger.warning("Telegram HTML ayrıştırma hatası, düz metinle yeniden deneniyor.")
+                text = html.unescape(_TAG_RE.sub("", text))
+                parse_mode = None
+                continue
+
+            logger.error(
+                f"Telegram API hatası ({response.status_code}): {self._redact(description or response.text)}"
+            )
+            return False
+
+        return False
+
     async def send_announcement(self, announcement: Announcement) -> bool:
         """Yeni bir ilanı Telegram kullanıcısına iletir."""
-        if not self.is_enabled or not self.is_configured:
+        if not self.is_ready:
             logger.debug(MessageStrings.TELEGRAM_DISABLED)
             return False
 
-        url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
-        message_text = self._format_announcement_message(announcement)
+        sent = await self._post_message(self._format_announcement_message(announcement))
+        if sent:
+            logger.info(MessageStrings.NOTIFICATION_SENT.format(title=announcement.title))
+        return sent
 
-        payload = {
-            "chat_id": self.chat_id,
-            "text": message_text,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": False,
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(url, json=payload)
-                if response.status_code == 200:
-                    logger.info(
-                        MessageStrings.NOTIFICATION_SENT.format(title=announcement.title)
-                    )
-                    return True
-
-                error_data = response.text
-                logger.error(
-                    f"Telegram API hatası ({response.status_code}): {self._redact(error_data)}"
-                )
-                raise TelegramDeliveryException(
-                    original_error=self._redact(error_data), chat_id=self.chat_id
-                )
-
-        except Exception as e:
-            logger.error(f"Telegram bildirimi gönderilemedi: {self._redact(e)}")
+    async def send_text(self, text: str) -> bool:
+        """Serbest HTML metin (özet/duyuru) gönderir."""
+        if not self.is_ready:
             return False
+        return await self._post_message(text)
 
     async def test_connection(self) -> bool:
         """Telegram botu bağlantısını test mesajı atarak doğrular."""
         if not self.is_configured:
             return False
-
-        url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
-        test_msg = (
-            "🔔 <b>KPSS Atama Takip Sistemi</b>\n\n"
-            "✅ Telegram bildirim bağlantısı başarıyla kuruldu!\n"
-            "Yeni bir atama veya personel alım ilanı yayınlandığında anında buradan haberdar edileceksiniz."
-        )
-
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(
-                    url,
-                    json={
-                        "chat_id": self.chat_id,
-                        "text": test_msg,
-                        "parse_mode": "HTML",
-                    },
-                )
-                return resp.status_code == 200
-        except Exception as e:
-            logger.error(f"Telegram test mesajı gönderilemedi: {self._redact(e)}")
-            return False
+        return await self._post_message(NotificationStrings.TEST_MESSAGE)
