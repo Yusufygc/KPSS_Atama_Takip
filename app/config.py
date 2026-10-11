@@ -44,6 +44,9 @@ class AppSettings(BaseSettings):
     # Kazıma & Zamanlama Parametreleri
     SCRAPER_INTERVAL_MINUTES: int = 15
     SCRAPER_CONCURRENT_WORKERS: int = 3
+    # Uygulama açıldığında ilk taramayı beklemeden (kısa gecikmeyle) başlat
+    SCRAPER_RUN_ON_STARTUP: bool = True
+    SCRAPER_STARTUP_DELAY_SECONDS: int = 20
     # İlan.gov.tr için Chrome/Edge/Chromium yolu (boşsa otomatik aranır)
     BROWSER_EXECUTABLE_PATH: str = ""
     # Chromium sandbox'ı yalnızca zaten izole bir kapsayıcı (Docker) içinde kapatılmalıdır

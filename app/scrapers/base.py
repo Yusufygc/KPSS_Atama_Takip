@@ -32,6 +32,15 @@ class BaseScraper(ABC):
         """Portaldan en güncel ilanları çeker ve standart DTO listesi döner."""
         pass
 
+    @staticmethod
+    def _parse_retry_after(value: Optional[str]) -> int:
+        """Retry-After başlığını saniyeye çevirir (sayı değilse varsayılan; üst sınır uygulanır)."""
+        try:
+            seconds = int(value) if value is not None else NetworkConstants.DEFAULT_RETRY_AFTER_SECONDS
+        except ValueError:
+            seconds = NetworkConstants.DEFAULT_RETRY_AFTER_SECONDS  # HTTP-date biçimi vb.
+        return max(0, min(seconds, NetworkConstants.MAX_RETRY_AFTER_SECONDS))
+
     async def _request(
         self,
         method: str,
@@ -66,7 +75,7 @@ class BaseScraper(ABC):
                     )
 
                     if response.status_code == 429:
-                        retry_after = int(response.headers.get("Retry-After", 5))
+                        retry_after = self._parse_retry_after(response.headers.get("Retry-After"))
                         self.logger.warning(
                             f"İstek limitine takıldı (429). {retry_after} sn bekleniyor..."
                         )
@@ -94,6 +103,17 @@ class BaseScraper(ABC):
 
                     response.raise_for_status()
                     return response
+
+            except httpx.HTTPStatusError as e:
+                # Kalıcı istemci hataları (404, 403 vb.) yeniden denemekle düzelmez
+                status_code = e.response.status_code
+                self.logger.warning(f"HTTP {status_code} alındı, yeniden denenmeyecek: {url}")
+                raise NetworkScraperException(
+                    message=f"Sunucu hatası: {status_code}",
+                    portal_key=self.portal_key,
+                    status_code=status_code,
+                    url=url,
+                ) from e
 
             except httpx.TimeoutException as e:
                 last_exception = e

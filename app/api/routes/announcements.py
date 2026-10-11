@@ -29,7 +29,7 @@ router = APIRouter(prefix="/announcements", tags=["İlanlar"])
 @router.get("", response_model=dict)
 async def list_announcements(
     service: AnnouncementServiceDep,
-    search: Optional[str] = Query(None, description="Arama metni"),
+    search: Optional[str] = Query(None, max_length=100, description="Arama metni"),
     city: Optional[str] = Query(None, description="Şehir / İl filtresi"),
     score_type: Optional[List[ScoreType]] = Query(None, description="Puan türleri"),
     source_key: Optional[List[str]] = Query(None, description="Kaynak portallar"),

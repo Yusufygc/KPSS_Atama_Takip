@@ -76,7 +76,7 @@ class TelegramNotifier(BaseNotifier):
             NotificationStrings.HEADER,
             "",
             NotificationStrings.INSTITUTION.format(institution=escape_html(item.institution)),
-            NotificationStrings.POSITION.format(position=escape_html(item.title)),
+            NotificationStrings.POSITION.format(position=escape_html(item.position or item.title)),
             NotificationStrings.SCORE_TYPE.format(score_type=score_badge),
         ]
 

@@ -143,19 +143,24 @@ class AnnouncementRepository:
                 return cursor.lastrowid
             return None
 
-    async def save_many(self, items: List[Announcement]) -> int:
-        """Toplu ilan kaydeder. Eklenen yeni kayıt sayısını döner."""
+    async def insert_new(self, items: List[Announcement]) -> List[Announcement]:
+        """İlanları tek bağlantı ve tek commit ile ekler; yalnızca YENİ eklenenleri (id atanmış) döner."""
         if not items:
-            return 0
+            return []
 
-        inserted_count = 0
+        inserted: List[Announcement] = []
         async with get_db_connection(self.db_path) as conn:
             for item in items:
                 cursor = await conn.execute(INSERT_SQL, _insert_params(item))
                 if cursor.rowcount > 0:
-                    inserted_count += 1
+                    item.id = cursor.lastrowid
+                    inserted.append(item)
             await conn.commit()
-        return inserted_count
+        return inserted
+
+    async def save_many(self, items: List[Announcement]) -> int:
+        """Toplu ilan kaydeder. Eklenen yeni kayıt sayısını döner."""
+        return len(await self.insert_new(items))
 
     async def get_by_id(self, announcement_id: int) -> Optional[Announcement]:
         """ID ile ilan getirir."""

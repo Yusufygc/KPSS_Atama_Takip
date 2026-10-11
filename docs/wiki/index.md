@@ -5,7 +5,7 @@ Hoş geldiniz. Bu dizin, KPSS Atama Takip Projesi'nin mimarisini, veri kaynaklar
 ## 🗺️ Sayfa Haritası ve Kategoriler
 
 ### 1. Mimari & Tasarım Prensipleri
-* [[architecture]]: Sistemin katmanlı mimarisi (Clean Architecture), tasarım desenleri (Adapter, Factory, Repository, Observer), asenkron işlem modeli ve veri akışı.
+* [[architecture]]: Sistemin katmanlı mimarisi (Clean Architecture), tasarım desenleri (Adapter, Factory, Repository), asenkron işlem modeli ve veri akışı.
 * [[rules]]: Proje anayasası, clean code prensipleri (SOLID, KISS, DRY), merkezi sabitler/ikonlar kuralı, loglama ve hata yönetimi standartları.
 
 ### 2. KPSS Stratejisi & Puan Türleri

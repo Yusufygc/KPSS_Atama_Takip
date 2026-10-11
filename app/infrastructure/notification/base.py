@@ -10,6 +10,11 @@ class BaseNotifier(ABC):
 
     channel_name: str
 
+    @property
+    @abstractmethod
+    def is_ready(self) -> bool:
+        """Kanal açık ve gönderime hazır mı (yapılandırılmış ve etkin)."""
+
     @abstractmethod
     async def send_announcement(self, announcement: Announcement) -> bool:
         """Yeni bir ilanı kullanıcıya iletir. Başarılıysa True döner."""

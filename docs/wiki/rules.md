@@ -30,9 +30,9 @@ Bu doküman, projenin tüm yaşam döngüsünde uyulması zorunlu olan mimari ve
 
 * **Adapter Pattern:** 6 farklı sitenin farklı yanıt formatları (JSON, HTML, PDF linki, ASP.NET WebForms) standart `Announcement` modeline dönüştürülür.
 * **Factory / Registry Pattern:** `ScraperRegistry` dinamik olarak kayıtlı kazıyıcıları keşfeder ve başlatır.
-* **Repository Pattern:** `AnnouncementRepository` ve `FilterRepository` veritabanı işlemlerini iş mantığından tamamen soyutlar.
-* **Observer / Event-Driven Pattern:** Yeni ilan keşfedildiğinde olay tetiklenir (`AnnouncementDiscoveredEvent`), dinleyiciler (TelegramNotifier, DatabaseLogger) haberdar edilir.
-* **Strategy Pattern:** İlanın başlık ve açıklamasındaki KPSS puanı (P3, P1, P2) ile aday profili strateji sınıfları üzerinden puanlanır ve filtrelenir.
+* **Repository Pattern:** `AnnouncementRepository` veritabanı işlemlerini iş mantığından soyutlar (filtreleme `AnnouncementFilterParams` ile bu sınıf içinde yapılır).
+* **Bildirim soyutlaması:** Servis katmanı `BaseNotifier` arayüzüne bağımlıdır; olay yayıncısı (Observer) şu an uygulanmamıştır.
+* **Kural motorları:** İlanın başlığındaki KPSS puanı (P3, P1, P2), bilişim alanı ve şehir `core/scoring/` altındaki sınıf metotlarıyla tespit edilir.
 
 ## 5. Hata Yönetimi (Exception Handling) ve İyileşme
 

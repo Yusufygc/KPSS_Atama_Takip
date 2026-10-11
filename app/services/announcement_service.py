@@ -23,6 +23,7 @@ from app.domain.schemas import (
     SystemStatsResponse,
 )
 from app.infrastructure.database.repository import AnnouncementRepository
+from app.infrastructure.notification.base import BaseNotifier
 from app.infrastructure.notification.telegram import TelegramNotifier
 from app.scrapers.orchestrator import ScraperOrchestrator
 
@@ -39,7 +40,7 @@ class AnnouncementService:
         self,
         repository: Optional[AnnouncementRepository] = None,
         orchestrator: Optional[ScraperOrchestrator] = None,
-        notifier: Optional[TelegramNotifier] = None,
+        notifier: Optional[BaseNotifier] = None,
     ) -> None:
         self.repository = repository or AnnouncementRepository()
         self.orchestrator = orchestrator or ScraperOrchestrator()
@@ -152,8 +153,7 @@ class AnnouncementService:
         statuses: List[ScraperRunStatus] = []
 
         for portal_key, created_dtos, status in results:
-            new_for_portal = 0
-
+            entities: List[Announcement] = []
             for dto in created_dtos:
                 # Güvenlik: yalnızca http/https adresli ilanlar kabul edilir (javascript: vb. reddedilir)
                 if not is_http_url(dto.url):
@@ -161,22 +161,17 @@ class AnnouncementService:
                     continue
                 if dto.pdf_url and not is_http_url(dto.pdf_url):
                     dto.pdf_url = None
+                entities.append(self._build_entity(dto))
 
-                entity = self._build_entity(dto)
+            # Mükerrer kontrolü INSERT OR IGNORE ile yapılır; portal başına tek bağlantı/commit
+            inserted = await self.repository.insert_new(entities)
+            for entity in inserted:
+                logger.info(
+                    MessageStrings.ANNOUNCEMENT_SAVED.format(portal=entity.source_name, title=entity.title)
+                )
 
-                # Mükerrer Kontrolü ve Kayıt
-                new_id = await self.repository.save(entity)
-                if new_id:
-                    new_for_portal += 1
-                    total_new_saved += 1
-                    logger.info(
-                        MessageStrings.ANNOUNCEMENT_SAVED.format(
-                            portal=entity.source_name,
-                            title=entity.title,
-                        )
-                    )
-
-            status.new_count = new_for_portal
+            status.new_count = len(inserted)
+            total_new_saved += len(inserted)
             statuses.append(status)
 
         # Bildirimler kayıt aşamasından ayrıdır: başarısız gönderimler sonraki taramada yeniden denenir

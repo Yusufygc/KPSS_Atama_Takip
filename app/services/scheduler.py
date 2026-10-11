@@ -1,5 +1,6 @@
 """KPSS Atama Takip - Arka Plan Zamanlayıcı Servisi (APScheduler)."""
 
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -38,14 +39,22 @@ class SchedulerService:
             return
 
         interval_minutes = settings.SCRAPER_INTERVAL_MINUTES
+        job_options = {}
+        if settings.SCRAPER_RUN_ON_STARTUP:
+            # Açılışta ilk taramayı kısa gecikmeyle başlat; aksi halde veri bir aralık boyunca bayat kalır.
+            # (APScheduler'da next_run_time=None işi duraklatır, bu yüzden yalnızca gerektiğinde verilir.)
+            job_options["next_run_time"] = datetime.now(timezone.utc) + timedelta(
+                seconds=settings.SCRAPER_STARTUP_DELAY_SECONDS
+            )
         self.scheduler.add_job(
             self._scheduled_task,
             trigger=IntervalTrigger(minutes=interval_minutes),
             id="periodic_scraper_job",
-            max_instances=1,
-            coalesce=True,
             name="Periyodik KPSS İlan Taraması",
             replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            **job_options,
         )
         self.scheduler.start()
         self._is_running = True

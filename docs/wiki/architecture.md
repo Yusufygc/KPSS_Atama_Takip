@@ -57,12 +57,12 @@ flowchart TD
    * Orkestratör tüm kayıtlı kazıyıcıları dinamik olarak çalıştırır.
 3. **Repository Pattern (`infrastructure/database/repository.py`):**
    * SQL sorguları servis katmanına sızmaz.
-   * `get_by_hash()`, `save_announcement()`, `list_announcements()`, `mark_notified()` gibi temiz metodlarla yönetilir.
-4. **Observer / Event Publisher (`core/events/`):**
-   * Yeni ilan bulunduğunda `AnnouncementCreatedEvent` yayınlanır.
-   * Bildirim motoru ve loglama mekanizması bu olaya abone olur.
-5. **Strategy Pattern (`core/scoring/strategy.py`):**
-   * `P3ScoringStrategy`, `P1P2ScoringStrategy` sınıfları ilan başlık ve açıklamalarını regex ve ağırlıklandırma ile analiz eder.
+   * `exists_by_hash()`, `save()`, `insert_new()`, `list_announcements()`, `get_unnotified_announcements()`, `mark_as_notified()` gibi temiz metodlarla yönetilir.
+4. **Bildirim Akışı (olay yayıncısı YOK):**
+   * Observer / olay sistemi uygulanmamıştır. `AnnouncementService` ilanları kaydettikten sonra `_notify_pending` ile bildirimleri doğrudan, `BaseNotifier` arayüzü üzerinden gönderir (bkz. [[notifications]]).
+   * Yeni bir kanal eklemek için `BaseNotifier` uygulanır; olay yayıncısına ihtiyaç duyulursa ileride eklenebilir.
+5. **Strategy (kural motoru) (`core/scoring/`):**
+   * `KPSSScoreMatcher`, `ITFieldMatcher` ve `CityMatcher` sınıf metotlarıyla çalışan kural motorlarıdır (regex ve anahtar kelime tabanlı); ayrı strateji sınıf hiyerarşisi yoktur.
 
 ## 3. Asenkron & Eşzamanlı Çalışma Modeli
 

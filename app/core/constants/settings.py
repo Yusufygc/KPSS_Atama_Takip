@@ -30,6 +30,8 @@ class NetworkConstants:
     MAX_RETRIES = 3
     RETRY_BACKOFF_FACTOR = 1.5  # Katlanarak artan bekleme faktörü
     RETRY_STATUS_CODES = [429, 500, 502, 503, 504]
+    DEFAULT_RETRY_AFTER_SECONDS = 5
+    MAX_RETRY_AFTER_SECONDS = 60
 
 
 class ScraperLimits:
