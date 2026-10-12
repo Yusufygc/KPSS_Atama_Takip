@@ -4,12 +4,17 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
-## [2026-10-12] DEPLOY | Gözetimsiz (7/24) Çalışma ve Oracle Cloud Rehberi
+## [2026-10-12] DEPLOY | Oracle Rehberi Kaldırıldı, Genel Dağıtım Rehberi
+* Oracle'a özgü dosyalar (`deploy/oracle/setup-vm.sh`, `docs/wiki/deploy-oracle.md`) kaldırıldı; yurt dışı bulutlar SBB/Kariyer Kapısı tarafından engellendiği için uygun değil. `deploy/env.production.example` ve genel [[deploy]] rehberi (Türkiye IP'li makine) kaldı.
+
+---
+
+## [2026-10-12] DEPLOY | Gözetimsiz (7/24) Çalışma ve Oracle Cloud Rehberi (tarihsel)
 * `app/services/backup.py`: günlük (04:00 TRT) SQLite online yedeği, en yeni N yedek saklanır (`DB_BACKUP_*`). Windows'ta `sqlite3.connect()` bağlam yöneticisinin bağlantıyı kapatmadığı hatası `closing()` ile giderildi.
 * Portal arıza uyarısı: art arda `PORTAL_FAILURE_ALERT_THRESHOLD` (3) hatada tek Telegram uyarısı, düzelince tek "yeniden çalışıyor" mesajı.
 * `scripts/check_portals.py`: kurulumdan önce portal erişimini (özellikle yurt dışı IP engelini) denetler; DB'ye yazmaz, Telegram'a göndermez.
 * `deploy/oracle/` (setup-vm.sh, env.production.example), `docker-compose.yml` (`init: true`, log rotasyonu), `.gitattributes` (betikler LF).
-* Rehber: [[deploy-oracle]].
+* Rehber: [[deploy]] (eski adı deploy-oracle).
 
 ---
 

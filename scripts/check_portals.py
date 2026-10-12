@@ -1,7 +1,7 @@
 """KPSS Atama Takip - Portal erişim kontrolü (kurulumdan önce / sorun gidermede çalıştırılır).
 
 Her portal için tek bir tarama yapıp sonucu özetler. Veritabanına YAZMAZ ve Telegram'a MESAJ GÖNDERMEZ;
-yalnızca kazıyıcıları çalıştırır. Özellikle Türkiye dışındaki sunucularda (örn. Oracle Cloud Frankfurt)
+yalnızca kazıyıcıları çalıştırır. Özellikle Türkiye dışındaki sunucularda (örn. yurt dışı bulut/VPS)
 kamu portallarının erişimi engelleyip engellemediğini kurulumdan ÖNCE anlamak için kullanılır.
 
 Kullanım:
@@ -73,7 +73,7 @@ async def main(as_json: bool) -> int:
             print(
                 "İpucu: hata mesajları erişim engeline işaret ediyor olabilir. Bazı kamu siteleri yurt dışı veya "
                 "veri merkezi IP'lerini engeller; sunucunuzu Türkiye'den erişilebilen bir konuma taşımayı veya "
-                "Türkiye çıkışlı bir proxy kullanmayı düşünün (docs/wiki/deploy-oracle.md > Sorun Giderme)."
+                "Türkiye çıkışlı bir proxy kullanmayı düşünün (docs/wiki/deploy.md > Sorun Giderme)."
             )
         return 1
     print("\nTüm portallar erişilebilir.")
