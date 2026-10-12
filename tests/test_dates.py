@@ -153,3 +153,68 @@ async def test_expired_items_are_listed_after_active_ones_regardless_of_priority
     # Filtre parametreleriyle birlikte de sıralama parametreleri doğru bağlanmalı
     items, total = await repo.list_announcements(AnnouncementFilterParams(search_text="aktif", only_active=True, limit=1))
     assert total == 1 and items[0].title == "aktif"
+
+
+# --- Şehir sayaçları (faceted count): sayaç, şehir seçilince görülecek liste sayısıyla tutarlı olmalı ---
+
+
+async def seed_city_data(repo):
+    def item(title, city, tags=None, scores=None):
+        return Announcement(
+            source_key="s", source_name="S", title=title, institution="I", url=f"https://a.test/{title}", city=city,
+            matched_score_types=scores or [ScoreType.GENERAL], field_tags=tags or [],
+        )
+
+    await repo.save_many(
+        [
+            item("Kayseri aşçı", "Kayseri"),
+            item("Kayseri garson", "Kayseri"),
+            item("Kayseri mühendis", "Kayseri", tags=["Yazılım & Web"], scores=[ScoreType.P3]),
+            item("Ankara yazılım", "Ankara", tags=["Yazılım & Web"], scores=[ScoreType.P3]),
+            item("Ankara memur", "Ankara"),
+        ]
+    )
+
+
+async def test_city_counts_follow_the_active_filters_and_match_the_list(db_ready):
+    repo = AnnouncementRepository()
+    await seed_city_data(repo)
+
+    async def counts(params):
+        return {c["name"]: c["count"] for c in await repo.get_distinct_cities(params)}
+
+    assert await counts(AnnouncementFilterParams()) == {"Kayseri": 3, "Ankara": 2}
+    assert await counts(AnnouncementFilterParams(only_it=True)) == {"Kayseri": 1, "Ankara": 1}
+    assert await counts(AnnouncementFilterParams(only_p3=True)) == {"Kayseri": 1, "Ankara": 1}
+    assert await counts(AnnouncementFilterParams(search_text="aşçı")) == {"Kayseri": 1}
+
+    # Sayaç ile şehir seçilince dönen liste her filtre kombinasyonunda birebir aynı olmalı
+    for base in (
+        AnnouncementFilterParams(),
+        AnnouncementFilterParams(only_it=True),
+        AnnouncementFilterParams(only_p3=True, only_active=True),
+        AnnouncementFilterParams(search_text="kayseri"),
+    ):
+        for city, count in (await counts(base)).items():
+            _, total = await repo.list_announcements(base.model_copy(update={"city": city}))
+            assert total == count, (base, city)
+
+
+async def test_city_counts_ignore_the_selected_city_itself(db_ready):
+    repo = AnnouncementRepository()
+    await seed_city_data(repo)
+    # Kayseri seçiliyken bile Ankara sayacı görünmeli (aksi halde şehir değiştirilemez)
+    cities = {c["name"]: c["count"] for c in await repo.get_distinct_cities(AnnouncementFilterParams(city="Kayseri"))}
+    assert cities == {"Kayseri": 3, "Ankara": 2}
+
+
+async def test_cities_endpoint_accepts_the_same_filters_as_the_list(client):
+    from app.api import dependencies
+
+    await seed_city_data(dependencies._repository)
+    all_cities = {c["name"]: c["count"] for c in (await client.get("/api/announcements/cities")).json()}
+    it_cities = {c["name"]: c["count"] for c in (await client.get("/api/announcements/cities?only_it=true")).json()}
+    assert all_cities == {"Kayseri": 3, "Ankara": 2} and it_cities == {"Kayseri": 1, "Ankara": 1}
+
+    listed = (await client.get("/api/announcements?city=Kayseri&only_it=true")).json()
+    assert listed["total"] == it_cities["Kayseri"]

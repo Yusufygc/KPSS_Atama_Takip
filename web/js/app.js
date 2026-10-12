@@ -195,14 +195,49 @@ function showToast(message, type = 'info') {
     }, 4000);
 }
 
-// 1. Şehirleri API'den Çek ve Doldur
+// Liste ve şehir sayaçları AYNI filtre sorgusunu kullanır (tek kaynak; sayaçlar listeyle tutarsız kalmasın).
+// includeCity=false: şehir sayaçları kendi seçimlerini hariç tutarak hesaplanır (faceted count).
+function buildFilterQuery({ includeCity = true } = {}) {
+    const query = new URLSearchParams({ only_active: state.onlyActive });
+
+    if (state.searchText) query.append('search', state.searchText);
+    if (includeCity && state.selectedCity) query.append('city', state.selectedCity);
+    if (state.selectedPortal) query.append('source_key', state.selectedPortal);
+
+    if (state.scoreFilter === 'IT') {
+        query.append('only_it', 'true');
+        if (state.selectedSubTag) {
+            query.append('field_tag', state.selectedSubTag);
+        }
+    } else if (state.scoreFilter === 'P3') {
+        query.append('only_p3', 'true');
+    } else if (state.scoreFilter === 'CAREER') {
+        query.append('score_type', 'P1');
+        query.append('score_type', 'P2');
+    }
+    return query;
+}
+
+// 1. Şehirleri API'den Çek ve Doldur (sayılar geçerli filtrelerle hesaplanır)
+let citiesAbort = null;
+
 async function fetchCities() {
+    if (citiesAbort) citiesAbort.abort();
+    const controller = new AbortController();
+    citiesAbort = controller;
+
     try {
-        const res = await fetch(`/api/announcements/cities?only_active=${state.onlyActive}`);
+        const query = buildFilterQuery({ includeCity: false });
+        const res = await fetch(`/api/announcements/cities?${query.toString()}`, { signal: controller.signal });
         if (!res.ok) return;
         const cities = await res.json();
+        if (controller !== citiesAbort) return;
 
-        // Dropdown'u temizle ve doldur
+        // Seçili şehir mevcut filtrelerle 0 ilana düşse bile listede kalır (seçim sessizce kaybolmasın)
+        if (state.selectedCity && !cities.some(c => c.name === state.selectedCity)) {
+            cities.push({ name: state.selectedCity, count: 0 });
+        }
+
         el.cityFilter.innerHTML = '<option value="">Tüm Şehirler</option>';
         cities.forEach(c => {
             const opt = document.createElement('option');
@@ -214,7 +249,7 @@ async function fetchCities() {
             el.cityFilter.appendChild(opt);
         });
     } catch (err) {
-        console.error('Şehir listesi yüklenemedi:', err);
+        if (err.name !== 'AbortError') console.error('Şehir listesi yüklenemedi:', err);
     }
 }
 
@@ -245,6 +280,9 @@ async function fetchAnnouncements() {
     const controller = new AbortController();
     announcementsAbort = controller;
 
+    // Her filtre değişiminde şehir sayaçları da yeni filtrelere göre yenilenir
+    fetchCities();
+
     el.announcementsContainer.innerHTML = `
         <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center text-slate-400 dark:text-slate-500">
             <div class="inline-flex items-center justify-center animate-spin mb-2">
@@ -255,27 +293,9 @@ async function fetchAnnouncements() {
     `;
 
     try {
-        const query = new URLSearchParams({
-            limit: state.limit,
-            offset: state.offset,
-            only_active: state.onlyActive
-        });
-
-        if (state.searchText) query.append('search', state.searchText);
-        if (state.selectedCity) query.append('city', state.selectedCity);
-        if (state.selectedPortal) query.append('source_key', state.selectedPortal);
-
-        if (state.scoreFilter === 'IT') {
-            query.append('only_it', 'true');
-            if (state.selectedSubTag) {
-                query.append('field_tag', state.selectedSubTag);
-            }
-        } else if (state.scoreFilter === 'P3') {
-            query.append('only_p3', 'true');
-        } else if (state.scoreFilter === 'CAREER') {
-            query.append('score_type', 'P1');
-            query.append('score_type', 'P2');
-        }
+        const query = buildFilterQuery();
+        query.set('limit', state.limit);
+        query.set('offset', state.offset);
 
         const res = await fetch(`/api/announcements?${query.toString()}`, { signal: controller.signal });
         if (!res.ok) throw new Error('Sunucu yanıt vermedi');
@@ -306,9 +326,26 @@ function renderAnnouncements(items) {
                     ${SVG_ICONS.search}
                 </div>
                 <h4 class="font-bold text-slate-800 dark:text-slate-200 text-sm">Eşleşen İlan Bulunamadı</h4>
-                <p class="text-xs text-slate-400 dark:text-slate-500">Arama veya şehir/portal filtrelerinizi sıfırlayarak yeniden deneyin.</p>
+                <p class="text-xs text-slate-400 dark:text-slate-500">
+                    ${state.selectedCity
+                        ? `Seçili filtrelerle <strong>${escapeHtml(state.selectedCity)}</strong> şehrinde ilan yok.`
+                        : 'Arama veya portal filtrelerinizi sıfırlayarak yeniden deneyin.'}
+                </p>
+                ${state.selectedCity ? `
+                    <button id="btnClearCityFilter" type="button" class="mt-1 inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition-colors">
+                        Şehir filtresini kaldır
+                    </button>` : ''}
             </div>
         `;
+        const clearCityBtn = document.getElementById('btnClearCityFilter');
+        if (clearCityBtn) {
+            clearCityBtn.addEventListener('click', () => {
+                state.selectedCity = '';
+                localStorage.removeItem('kpss_city');
+                state.offset = 0;
+                fetchAnnouncements();
+            });
+        }
         return;
     }
 

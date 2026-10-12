@@ -1,9 +1,9 @@
 """KPSS Atama Takip - İlan REST Uç Noktaları."""
 
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse
 
 from app.api.dependencies import AnnouncementServiceDep
@@ -26,9 +26,7 @@ logger = get_logger("routes.announcements")
 router = APIRouter(prefix="/announcements", tags=["İlanlar"])
 
 
-@router.get("", response_model=dict)
-async def list_announcements(
-    service: AnnouncementServiceDep,
+def get_filter_params(
     search: Optional[str] = Query(None, max_length=100, description="Arama metni"),
     city: Optional[str] = Query(None, description="Şehir / İl filtresi"),
     score_type: Optional[List[ScoreType]] = Query(None, description="Puan türleri"),
@@ -38,11 +36,9 @@ async def list_announcements(
     field_tag: Optional[str] = Query(None, description="Bilişim alt uzmanlık etiketi"),
     only_unnotified: bool = Query(False, description="Sadece bildirilmemiş olanlar"),
     only_active: bool = Query(False, description="Süresi dolmamış (veya tarihi bilinmeyen) ilanlar"),
-    limit: int = Query(50, ge=1, le=200, description="Sayfa boyutu"),
-    offset: int = Query(0, ge=0, description="Sayfa başlangıcı"),
-):
-    """Filtrelenmiş ve sayfalanmış KPSS atama ilanlarını döner."""
-    params = AnnouncementFilterParams(
+) -> AnnouncementFilterParams:
+    """Liste ve şehir sayaçları için ORTAK filtre parametreleri (aynı mantık, tek yer)."""
+    return AnnouncementFilterParams(
         search_text=search,
         city=city,
         score_types=score_type,
@@ -52,9 +48,22 @@ async def list_announcements(
         field_tag=field_tag,
         only_unnotified=only_unnotified,
         only_active=only_active,
-        limit=limit,
-        offset=offset,
     )
+
+
+FilterParamsDep = Annotated[AnnouncementFilterParams, Depends(get_filter_params)]
+
+
+@router.get("", response_model=dict)
+async def list_announcements(
+    service: AnnouncementServiceDep,
+    params: FilterParamsDep,
+    limit: int = Query(50, ge=1, le=200, description="Sayfa boyutu"),
+    offset: int = Query(0, ge=0, description="Sayfa başlangıcı"),
+):
+    """Filtrelenmiş ve sayfalanmış KPSS atama ilanlarını döner."""
+    params.limit = limit
+    params.offset = offset
     items, total = await service.get_announcements(params)
     return {
         "items": items,
@@ -65,12 +74,13 @@ async def list_announcements(
 
 
 @router.get("/cities", response_model=List[CityCountResponse])
-async def list_cities(
-    service: AnnouncementServiceDep,
-    only_active: bool = Query(False, description="Yalnızca süresi dolmamış ilanlar"),
-):
-    """İlanlarda geçen şehirleri ve ilan sayılarını döner."""
-    return await service.repository.get_distinct_cities(only_active=only_active)
+async def list_cities(service: AnnouncementServiceDep, params: FilterParamsDep):
+    """Şehirleri ve ilan sayılarını döner.
+
+    Sayılar, verilen diğer filtrelerle (şehir hariç) hesaplanır; yani sayaç, o şehri seçince
+    aynı filtrelerle listede göreceğiniz ilan sayısıdır.
+    """
+    return await service.repository.get_distinct_cities(params)
 
 
 @router.get("/stats", response_model=SystemStatsResponse)

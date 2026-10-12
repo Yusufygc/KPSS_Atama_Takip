@@ -170,11 +170,14 @@ class AnnouncementRepository:
                 row = await cursor.fetchone()
                 return self._row_to_entity(row) if row else None
 
-    async def list_announcements(
-        self,
-        params: AnnouncementFilterParams,
-    ) -> Tuple[List[Announcement], int]:
-        """Filtre parametrelerine göre ilanları ve toplam eşleşen sayısını döner."""
+    @staticmethod
+    def _build_where(params: AnnouncementFilterParams, include_city: bool = True) -> Tuple[str, List[Any]]:
+        """Filtre parametrelerinden WHERE ifadesi ve bağlama parametrelerini üretir.
+
+        Liste ve şehir sayacı AYNI filtre mantığını kullanır; include_city=False şehir sayaçlarında
+        (faceted count) şehir koşulunu dışarıda bırakır. Böylece açılır listedeki "(3)" sayısı, o şehri
+        seçtiğinizde diğer filtrelerle gerçekten göreceğiniz ilan sayısıyla tutarlı olur.
+        """
         conditions: List[str] = []
         sql_params: List[Any] = []
 
@@ -213,11 +216,19 @@ class AnnouncementRepository:
             conditions.append(f"field_tags LIKE ? {LIKE_ESCAPE}")
             sql_params.append(f"%\"{_escape_like(params.field_tag.strip())}\"%")
 
-        if params.city:
+        if include_city and params.city:
             conditions.append("city = ?")
             sql_params.append(params.city.strip())
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        return where_clause, sql_params
+
+    async def list_announcements(
+        self,
+        params: AnnouncementFilterParams,
+    ) -> Tuple[List[Announcement], int]:
+        """Filtre parametrelerine göre ilanları ve toplam eşleşen sayısını döner."""
+        where_clause, sql_params = self._build_where(params)
 
         # Toplam eşleşme sayısı sorgusu
         # where_clause yalnızca sabit koşul ve ? yer tutucularından oluşur; kullanıcı girdisi parametre olarak geçer
@@ -341,16 +352,27 @@ class AnnouncementRepository:
             by_source=by_source,
         )
 
-    async def get_distinct_cities(self, only_active: bool = False) -> List[Dict[str, Any]]:
-        """Kayıtlı şehirlerin listesini ve her birindeki ilan sayısını döner."""
-        where, params = self._active_clause(only_active)
-        condition = "city IS NOT NULL AND city != ''"
-        where = f"{where} AND {condition}" if where else f" WHERE {condition}"
+    async def get_distinct_cities(
+        self,
+        params: Optional[AnnouncementFilterParams] = None,
+        only_active: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Şehirleri ve her birindeki ilan sayısını döner.
+
+        `params` verilirse sayılar bu filtrelerle (şehir koşulu hariç) hesaplanır; böylece sayaç,
+        şehir seçildiğinde listede görünecek ilan sayısıyla eşleşir.
+        """
+        effective = params.model_copy() if params else AnnouncementFilterParams()
+        if only_active:
+            effective.only_active = True
+        where_clause, sql_params = self._build_where(effective, include_city=False)
+        city_condition = "city IS NOT NULL AND city != ''"
+        where_clause = f"{where_clause} AND {city_condition}" if where_clause else f"WHERE {city_condition}"
         sql = (
-            f"SELECT city, COUNT(*) AS count FROM announcements{where} "  # noqa: S608  # nosec B608
+            f"SELECT city, COUNT(*) AS count FROM announcements {where_clause} "  # noqa: S608  # nosec B608
             "GROUP BY city ORDER BY count DESC, city ASC;"
         )
         async with get_db_connection(self.db_path) as conn:
-            async with conn.execute(sql, params) as cursor:
+            async with conn.execute(sql, sql_params) as cursor:
                 rows = await cursor.fetchall()
                 return [{"name": row["city"], "count": row["count"]} for row in rows]

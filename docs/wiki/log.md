@@ -4,6 +4,13 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 
 ---
 
+## [2026-10-12] FIX | Şehir Sayacı ile Filtre Sonucu Tutarsızlığı
+* **Sorun:** Şehir açılır listesindeki sayı ("Kayseri (3)") yalnızca "süresi dolmamış" filtresini dikkate alıyordu; sekme (Bölümüm/P3/P1-P2), arama, portal ve alt uzmanlık filtreleri sayıya yansımıyordu. Kullanıcı "Bölümüm" sekmesindeyken Kayseri'yi seçince 3 yerine 0 ilan görüyordu (arka uç doğruydu: Kayseri'deki 3 ilan bilişim değildi, ama sayaç yanıltıcıydı).
+* **Çözüm:** Liste ve şehir sayaçları artık aynı filtre mantığını kullanır (`AnnouncementRepository._build_where`, API'de ortak `get_filter_params` bağımlılığı). `/api/announcements/cities` liste ile aynı parametreleri alır ve şehir koşulunu hariç tutarak sayar (faceted count). Arayüzde her filtre değişiminde sayaçlar yenilenir, seçili şehir 0'a düşse de listede kalır ve boş sonuçta "Şehir filtresini kaldır" kısayolu çıkar.
+* Bağlantılar: [[architecture]]
+
+---
+
 ## [2026-10-12] TEST ORTAMI | Gerçek Telegram'a ve Gerçek DB'ye Kapalı Test Ortamı
 * `.env.test`, `python run.py --test`, `baslat-test.bat`, `docker-compose.test.yml` (port 8001) ve `scripts/seed_test_db.py` (`data/test/kpss_test.db`) eklendi.
 * `APP_ENV=test` Telegram'ı zorla kapatır ve `kpss_atama.db` kullanımını reddeder; bkz. [[security]].
