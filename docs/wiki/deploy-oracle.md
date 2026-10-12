@@ -4,6 +4,19 @@ Bu rehber uygulamayı bir Oracle Cloud "Always Free" sanal makinesinde 7/24 çal
 Telegram'a bildirim gönderir. Uygulama internete yalnızca **dışarı** bağlanır (portallar + Telegram); sunucuda
 dışarıya açık bir port gerekmez.
 
+> **UYARI (2026-10-12 ölçümü): yurt dışı veri merkezleri iki ana kaynağa erişemiyor.**
+> Herkese açık bir ağ denetleme servisiyle (check-host.net) portallar Frankfurt, Amsterdam, Zürih, Milano, Londra ve ABD veri merkezlerinden denendi:
+>
+> | Portal | Türkiye (İstanbul) | Yurt dışı veri merkezleri |
+> |---|---|---|
+> | Kamu İlan (SBB) | HTTP 200 | **403 Forbidden** (denenen tüm ülkelerde) |
+> | Kariyer Kapısı API | ulaşılabiliyor | **bağlantı zaman aşımı** (tüm ülkelerde) |
+> | İŞKUR, İlan.gov.tr, Resmî Gazete | 200 | 200 |
+> | Yerel Yönetimler | 200 | karışık (çoğunda 200) |
+>
+> Yani Oracle'ın ücretsiz bölgelerinde (hepsi yurt dışı) en çok ilanı veren SBB ve Kariyer Kapısı çalışmaz. Oracle ancak Türkiye çıkışlı bir proxy ile kullanılabilir.
+> Türkiye IP'li bir ortam (ev bilgisayarı/mini PC veya Türkiye'deki bir VPS) önerilir. Aşağıdaki adımlar (Docker + `setup-vm.sh` + `check_portals.py`) herhangi bir Ubuntu/Debian makinede de aynen geçerlidir.
+
 ## 0. Başlamadan Önce Bilmeniz Gerekenler
 
 | Konu | Açıklama |
