@@ -36,6 +36,7 @@ def isolated_settings(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "API_KEY", "")
     monkeypatch.setattr(settings, "TELEGRAM_NOTIFICATIONS_ENABLED", False)
     monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "")
+    monkeypatch.setattr(settings, "TELEGRAM_NOTIFY_FILTER", "all")  # filtre testleri kendi modunu ayarlar
     monkeypatch.setattr(settings, "TELEGRAM_CHAT_ID", "")
 
     # api.dependencies içindeki paylaşılan bildirici içe aktarma anında .env değerleriyle üretilir;

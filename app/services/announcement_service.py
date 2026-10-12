@@ -14,7 +14,7 @@ from app.core.scoring.city_matcher import CityMatcher
 from app.core.scoring.it_field_matcher import ITFieldMatcher
 from app.core.scoring.strategy import KPSSScoreMatcher
 from app.core.security import escape_html, is_http_url
-from app.domain.models import Announcement
+from app.domain.models import Announcement, ScoreType
 from app.domain.schemas import (
     AnnouncementCreate,
     AnnouncementFilterParams,
@@ -219,6 +219,22 @@ class AnnouncementService:
                         NotificationStrings.PORTAL_RECOVERED.format(portal=escape_html(status.portal_name))
                     )
 
+    @staticmethod
+    def _matches_notify_filter(item: Announcement) -> bool:
+        """İlanın TELEGRAM_NOTIFY_FILTER ayarına göre bildirilmeye uygun olup olmadığını döner."""
+        mode = settings.TELEGRAM_NOTIFY_FILTER
+        is_p3 = ScoreType.P3 in item.matched_score_types
+        is_it = bool(item.field_tags)
+        if mode == "p3":
+            return is_p3
+        if mode == "it":
+            return is_it
+        if mode == "p3_and_it":
+            return is_p3 and is_it
+        if mode == "p3_or_it":
+            return is_p3 or is_it
+        return True  # "all"
+
     async def _notify_pending(self, is_first_run: bool) -> None:
         """Bildirilmemiş yeni ilanları öncelik sırasıyla, hız sınırına uyarak Telegram'a iletir.
 
@@ -234,6 +250,18 @@ class AnnouncementService:
         )
         if not pending:
             return
+
+        # Bildirim filtresine uymayan ilanlar (örn. P3 olmayan ve bilişimle ilgisiz) Telegram'a gönderilmez;
+        # tekrar tekrar değerlendirilmesin diye "bildirildi" işaretlenir (panelde yine görünürler).
+        irrelevant = [i for i in pending if not self._matches_notify_filter(i)]
+        if irrelevant:
+            await self.repository.mark_as_notified([i.id for i in irrelevant])
+            logger.info(
+                MessageStrings.NOTIFY_FILTERED.format(mode=settings.TELEGRAM_NOTIFY_FILTER, count=len(irrelevant))
+            )
+            pending = [i for i in pending if i not in irrelevant]
+            if not pending:
+                return
 
         # Son başvuru günü geçmiş ilanlar için bildirim anlamsızdır: sessizce "bildirildi" işaretlenir
         today_iso = today_in_turkey().isoformat()

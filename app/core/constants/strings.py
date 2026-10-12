@@ -40,6 +40,7 @@ class MessageStrings:
     NOTIFY_SUMMARY = "Bildirim: {sent} ilan tek tek, {summarized} ilan özet olarak iletildi."
     PORTAL_DOWN_LOG = "Portal art arda {count} taramadır hata veriyor: {portal} ({error})"
     PORTAL_RECOVERED_LOG = "Portal yeniden çalışıyor: {portal}"
+    NOTIFY_FILTERED = "Bildirim filtresi ({mode}): {count} ilan Telegram'a gönderilmeden işaretlendi."
     NOTIFY_ABORTED = "Telegram art arda hata verdi, kalan bildirimler sonraki taramaya bırakıldı."
 
 

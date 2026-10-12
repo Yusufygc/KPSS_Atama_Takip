@@ -45,6 +45,13 @@ class AppSettings(BaseSettings):
     PORTAL_FAILURE_ALERT_THRESHOLD: int = 3
     # Boş veritabanında ilk taramada bulunan mevcut ilanlar için bildirim gönderilsin mi (varsayılan: hayır)
     NOTIFY_ON_FIRST_RUN: bool = False
+    # Hangi ilanlar için Telegram bildirimi gönderilsin:
+    #   p3_or_it  -> KPSS P3 puanlı VEYA bilgisayar/bilişim alanındaki ilanlar (varsayılan)
+    #   p3_and_it -> hem P3 hem bilişim alanında olanlar (çok dar)
+    #   p3 | it   -> yalnızca P3 veya yalnızca bilişim
+    #   all       -> tüm yeni ilanlar
+    # Filtreye uymayan ilanlar yine kaydedilir ve web panelinde görünür; yalnızca Telegram'a gönderilmez.
+    TELEGRAM_NOTIFY_FILTER: Literal["all", "p3_or_it", "p3_and_it", "p3", "it"] = "p3_or_it"
     # Tek taramada tek tek gönderilecek en fazla bildirim; fazlası tek özet mesajıyla bildirilir
     TELEGRAM_MAX_PER_CYCLE: int = 15
     # Mesajlar arası bekleme (Telegram aynı sohbete saniyede ~1 mesaj önerir)

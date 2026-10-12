@@ -282,3 +282,68 @@ def test_telegram_message_shows_normalized_deadline():
         deadline_date="12 Ekim - 26 Ekim", created_at="2026-10-12T08:00:00+00:00",
     )
     assert "26.10.2026" in TelegramNotifier(bot_token="1:a", chat_id="1", is_enabled=True)._format_announcement_message(item)
+
+
+# --- Bildirim filtresi: yalnızca P3 ve/veya bilgisayar-bilişim alanı ---
+
+P3_ONLY = "Zabıta Memuru alımı"  # P3 anahtar kelimesi, bilişim etiketi yok
+IT_ONLY = "Siber güvenlik uzmanı alımı"  # bilişim etiketi var, P3 anahtar kelimesi yok
+BOTH = "Yazılım Mühendisi alımı"  # hem P3 hem bilişim
+NEITHER = "Genel duyuru metni"
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        ("p3_or_it", {P3_ONLY, IT_ONLY, BOTH}),
+        ("p3_and_it", {BOTH}),
+        ("p3", {P3_ONLY, BOTH}),
+        ("it", {IT_ONLY, BOTH}),
+        ("all", {P3_ONLY, IT_ONLY, BOTH, NEITHER}),
+    ],
+)
+async def test_notify_filter_modes(build, monkeypatch, mode, expected):
+    monkeypatch.setattr(settings, "TELEGRAM_NOTIFY_FILTER", mode)
+    notifier = FakeNotifier()
+    service, orchestrator = build(notifier)
+    await seed(service)
+    orchestrator.dtos = [dto(P3_ONLY), dto(IT_ONLY), dto(BOTH), dto(NEITHER)]
+
+    await service.run_full_cycle()
+
+    assert set(notifier.sent_titles) == expected
+    assert await unnotified_count(service) == 0, "Filtreye uymayanlar da 'bildirildi' işaretlenmeli (tekrar değerlendirilmesin)"
+
+
+async def test_filtered_out_items_are_still_stored_and_listed(build, monkeypatch):
+    monkeypatch.setattr(settings, "TELEGRAM_NOTIFY_FILTER", "p3_or_it")
+    notifier = FakeNotifier()
+    service, orchestrator = build(notifier)
+    await seed(service)
+    orchestrator.dtos = [dto(NEITHER)]
+
+    new_count, _ = await service.run_full_cycle()
+
+    assert new_count == 1 and notifier.sent_titles == []
+    items, total = await service.repository.list_announcements(AnnouncementFilterParams())
+    assert NEITHER in [i.title for i in items]
+
+
+async def test_summary_counts_only_relevant_overflow(build, monkeypatch):
+    monkeypatch.setattr(settings, "TELEGRAM_NOTIFY_FILTER", "p3_or_it")
+    monkeypatch.setattr(settings, "TELEGRAM_MAX_PER_CYCLE", 1)
+    notifier = FakeNotifier()
+    service, orchestrator = build(notifier)
+    await seed(service)
+    orchestrator.dtos = [dto(f"Genel duyuru {i}") for i in range(5)] + [dto("Zabıta Memuru A"), dto("Zabıta Memuru B"), dto("Zabıta Memuru C")]
+
+    await service.run_full_cycle()
+
+    assert len(notifier.sent_titles) == 1
+    assert len(notifier.texts) == 1 and "2 ilan daha" in notifier.texts[0], "Özet yalnızca ilgili ilanları saymalı"
+
+
+def test_notify_filter_default_is_p3_or_it():
+    from app.config import AppSettings
+
+    assert AppSettings(_env_file=None).TELEGRAM_NOTIFY_FILTER == "p3_or_it"

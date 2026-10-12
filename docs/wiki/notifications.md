@@ -37,6 +37,13 @@ Her ilan sisteme girdiğinde benzersiz bir parmak izi (hash) üretilir:
 * `/tara` - Anlık olarak tarayıcı motorunu çalıştırma.
 * `/puan p3` - Sadece P3 ilanlarını filtreleme.
 
+## Hangi İlanlar Bildirilir (`TELEGRAM_NOTIFY_FILTER`)
+* **`p3_or_it` (varsayılan):** KPSS **P3** puanlı **veya** bilgisayar/bilişim alanındaki (`field_tags` dolu) ilanlar.
+* `p3_and_it`: yalnızca ikisi birden; `p3` / `it`: yalnızca biri; `all`: hepsi.
+* Filtreye uymayan ilanlar yine kaydedilir ve web panelinde görünür; yalnızca Telegram'a gönderilmez. Tekrar değerlendirilmesin diye "bildirildi" işaretlenir.
+* Taşma özeti ("N ilan daha eklendi") yalnızca filtreye uyan ilanları sayar. Portal arıza uyarıları filtreden bağımsızdır.
+* Not: P3 eşleştirmesi anahtar kelime tabanlıdır ("Sözleşmeli Personel" gibi genel ifadeler de P3 sayılır); bildirim sayısı çok gelirse `it` veya `p3_and_it` kullanılabilir.
+
 ## Gönderim Akışı ve Sınırlar
 * **Ayrı aşama:** İlanlar önce kaydedilir, bildirimler tarama sonunda `AnnouncementService._notify_pending` ile gönderilir.
 * **İlk çalıştırma tabanı:** Boş veritabanında bulunan mevcut ilanlar sessizce "bildirildi" işaretlenir (`NOTIFY_ON_FIRST_RUN=true` ile kapatılabilir).
