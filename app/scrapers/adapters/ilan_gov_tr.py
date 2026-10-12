@@ -1,7 +1,9 @@
 """KPSS Atama Takip - İlan.gov.tr (BİK) Kazıyıcı Adaptörü."""
 
 import asyncio
+import os
 import shutil
+import subprocess
 from pathlib import Path
 from typing import List, Optional
 
@@ -44,8 +46,8 @@ class IlanGovTrScraper(BaseScraper):
         ]
         return next((c for c in candidates if c.exists()), None)
 
-    async def _dump_dom(self, browser_exe: Path) -> str:
-        """Headless tarayıcıyla sayfanın DOM çıktısını alır; zaman aşımında süreci öldürür."""
+    def _build_command(self, browser_exe: Path) -> List[str]:
+        """Headless tarayıcı komut satırını üretir."""
         cmd = [
             str(browser_exe),
             "--headless=new",
@@ -54,24 +56,53 @@ class IlanGovTrScraper(BaseScraper):
         ]
         if settings.BROWSER_NO_SANDBOX:
             cmd.append("--no-sandbox")
-        cmd += ["--dump-dom", self.CATEGORY_URL]
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        try:
-            stdout, _ = await asyncio.wait_for(
-                process.communicate(), timeout=ScraperLimits.BROWSER_TIMEOUT_SECONDS
+        return cmd + ["--dump-dom", self.CATEGORY_URL]
+
+    @staticmethod
+    def _kill_process_tree(process: "subprocess.Popen[bytes]") -> None:
+        """Tarayıcıyı alt süreçleriyle birlikte sonlandırır (Chrome çok süreçli çalışır)."""
+        if os.name == "nt":
+            # Windows'ta Popen.kill() yalnızca ana süreci öldürür; /T alt süreçleri de kapatır
+            subprocess.run(  # noqa: S603
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],  # noqa: S607
+                capture_output=True,
+                check=False,
             )
-        except asyncio.TimeoutError as exc:
-            # Artık Chrome süreçlerinin birikmesini önlemek için süreci sonlandır
+        else:
             process.kill()
-            await process.wait()
+
+    def _run_browser_blocking(self, cmd: List[str]) -> bytes:
+        """Tarayıcıyı çalıştırıp çıktısını döner; zaman aşımında süreç ağacını öldürür."""
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)  # noqa: S603  # nosec B603
+        try:
+            stdout, _ = process.communicate(timeout=ScraperLimits.BROWSER_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            self._kill_process_tree(process)
+            process.communicate()
+            raise
+        return stdout
+
+    async def _dump_dom(self, browser_exe: Path) -> str:
+        """Headless tarayıcıyla sayfanın DOM çıktısını alır; zaman aşımında süreci öldürür.
+
+        `asyncio.create_subprocess_exec` yerine ayrı iş parçacığında `subprocess.Popen` kullanılır:
+        Windows'ta uvicorn `reload` modu SelectorEventLoop kullanır ve bu döngü asyncio alt süreç
+        oluşturmayı desteklemez (NotImplementedError).
+        """
+        cmd = self._build_command(browser_exe)
+        try:
+            stdout = await asyncio.to_thread(self._run_browser_blocking, cmd)
+        except subprocess.TimeoutExpired as exc:
             raise NetworkScraperException(
                 message=ErrorStrings.BROWSER_TIMEOUT,
                 portal_key=self.portal_key,
                 url=self.CATEGORY_URL,
+            ) from exc
+        except OSError as exc:
+            raise ScraperException(
+                message=f"{ErrorStrings.BROWSER_START_FAILED}: {exc}",
+                portal_key=self.portal_key,
+                error_code="SCRAPER_BROWSER_START_FAILED",
             ) from exc
         return stdout.decode("utf-8", errors="ignore")
 

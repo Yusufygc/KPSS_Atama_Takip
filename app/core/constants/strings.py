@@ -59,6 +59,7 @@ class ErrorStrings:
     DOCUMENT_TOO_LARGE = "İlan belgesi izin verilen boyut sınırını aşıyor."
     BROWSER_NOT_FOUND = "Headless tarayıcı (Chrome/Edge/Chromium) bulunamadı."
     BROWSER_TIMEOUT = "Headless tarayıcı zaman aşımına uğradı."
+    BROWSER_START_FAILED = "Headless tarayıcı başlatılamadı"
 
 
 class NotificationStrings:
