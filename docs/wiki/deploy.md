@@ -29,7 +29,40 @@ bir IP'den çalışması gerekir.
 **Veritabanı (SQLite) bir sorun değildir:** Neon vb. barındırılan bir veritabanı kazıyıcının IP'sini değiştirmez;
 engel veritabanında değil, portallara giden isteğin çıkış IP'sindedir. Uygulama ayrıca SQLite'a göre yazılmıştır.
 
-## 1. Hazırlık
+## 0b. Şimdilik: Kendi Windows Bilgisayarınızda (Docker'sız)
+
+Boş bir makine yokken uygulama kendi bilgisayarınızda çalışır. Docker gerekmez; mevcut `venv` kullanılır.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\windows\kur-otomatik-baslat.ps1      # bir kez
+Start-ScheduledTask -TaskName KPSS-Atama-Takip                                         # hemen başlat
+```
+* Windows oturumunuz açılınca uygulama **pencere açmadan** başlar; çökerse 1 dakikada yeniden başlar.
+* Yalnızca bu bilgisayardan erişilir (`APP_HOST=127.0.0.1` betik tarafından ezilir), otomatik yeniden yükleme kapalıdır.
+* Loglar: `logs/service.out.log`, `logs/service.err.log`, uygulama logu `logs/app.log`.
+* Durdur: `Stop-ScheduledTask -TaskName KPSS-Atama-Takip`. Kaldır: aynı betik `-Kaldir` ile.
+* Elle açmak isterseniz `baslat.bat` yine çalışır; görev açıksa ikinci kopya portu görüp kendiliğinden çıkar.
+
+**Bilgisayar kapalı/uykudayken** tarama olmaz ve Telegram gelmez. Açıldığında portallarda hâlâ listelenen ilanlar
+yeni sayılıp bildirilir (boş olmayan veritabanında ilk-açılış sessizliği uygulanmaz); portaldan kalkmış ilanlar
+kaçar. Uyku için: Ayarlar > Sistem > Güç > "Ekranı ve uykuyu" prizde **Hiçbir zaman**; dizüstüyse kapak kapanınca
+"hiçbir şey yapma". Windows güncelleme yeniden başlatmalarında oturum açıldığında uygulama kendisi döner.
+
+## 0c. İleride: Raspberry Pi'ye Geçiş
+
+Pi'de aynı proje Docker ile çalışır (bölüm 1-7). Geçişte taşınacaklar yalnızca `.env` ve `data/kpss_atama.db`:
+
+1. Windows'ta görevi durdurun: `Stop-ScheduledTask -TaskName KPSS-Atama-Takip`.
+2. Pi'ye 64-bit Raspberry Pi OS (veya Ubuntu) kurun, Docker kurun, projeyi `git clone` edin.
+3. `.env` ve `data/kpss_atama.db` dosyalarını Pi'ye kopyalayın (`scp`); `sudo chown -R 1000:1000 data logs`.
+   Bildirim geçmişi veritabanında olduğu için eski ilanlar için tekrar mesaj gitmez.
+4. `docker compose build`, ardından `docker compose run --rm kpss-tracker python scripts/check_portals.py`
+   (ARM64 imajı henüz denenmedi; bu adım doğrulamadır), sonra `docker compose up -d`.
+5. Windows görevini kaldırın (`-Kaldir`). **İki makine aynı anda çalışmasın**: aynı bota çift bildirim gider.
+
+Pi'nin evdeki internetten çıkması gerekir (Türkiye IP'si); bölüm 0'daki kısıt aynen geçerlidir.
+
+## 1. Hazırlık (Docker ile; Raspberry Pi / Linux)
 
 * Docker ve Docker Compose kurun (Windows/Mac: Docker Desktop; Linux: `docker.io` + `docker-compose-v2`).
 * Linux'ta veri dizinlerini konteyner kullanıcısı (uid 1000) için hazırlayın:
