@@ -37,10 +37,10 @@ Boş bir makine yokken uygulama kendi bilgisayarınızda çalışır. Docker ger
 powershell -ExecutionPolicy Bypass -File scripts\windows\kur-otomatik-baslat.ps1      # bir kez
 Start-ScheduledTask -TaskName KPSS-Atama-Takip                                         # hemen başlat
 ```
-* Windows oturumunuz açılınca uygulama **pencere açmadan** başlar; çökerse 1 dakikada yeniden başlar.
+* Windows oturumunuz açılınca uygulama **konsol penceresi ve görev çubuğu simgesi olmadan** başlar (`pythonw.exe` ile `scripts/windows/service.pyw`); çökerse 1 dakikada yeniden başlar.
 * Yalnızca bu bilgisayardan erişilir (`APP_HOST=127.0.0.1` betik tarafından ezilir), otomatik yeniden yükleme kapalıdır.
-* Loglar: `logs/service.out.log`, `logs/service.err.log`, uygulama logu `logs/app.log`.
-* Durdur: `Stop-ScheduledTask -TaskName KPSS-Atama-Takip`. Kaldır: aynı betik `-Kaldir` ile.
+* Loglar: `logs/service.log` (konsol çıktısı), `logs/app.log` (uygulama logu).
+* Durdur: `Stop-ScheduledTask -TaskName KPSS-Atama-Takip` görevi durdurur ama uygulama süreci açık kalabilir; kesin durdurmak için `Get-Process pythonw | Stop-Process` kullanın. Kaldır: aynı betik `-Kaldir` ile.
 * Elle açmak isterseniz `baslat.bat` yine çalışır; görev açıksa ikinci kopya portu görüp kendiliğinden çıkar.
 
 **Bilgisayar kapalı/uykudayken** tarama olmaz ve Telegram gelmez. Açıldığında portallarda hâlâ listelenen ilanlar

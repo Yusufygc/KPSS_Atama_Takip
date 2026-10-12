@@ -7,7 +7,7 @@ Bu dosya, proje üzerinde gerçekleştirilen tüm önemli mimari kararların, ka
 ## [2026-10-12] DEPLOY | Oracle Rehberi Kaldırıldı, Genel Dağıtım Rehberi
 * Oracle'a özgü dosyalar (`deploy/oracle/setup-vm.sh`, `docs/wiki/deploy-oracle.md`) kaldırıldı; yurt dışı bulutlar SBB/Kariyer Kapısı tarafından engellendiği için uygun değil. `deploy/env.production.example` ve genel [[deploy]] rehberi (Türkiye IP'li makine) kaldı.
 
-* `scripts/windows/` (baslat-gizli.ps1, kur-otomatik-baslat.ps1): kendi Windows PC'de oturum açılışında gizli otomatik başlatma (Görev Zamanlayıcı); Pi'ye geçiş adımları [[deploy]] içinde.
+* `scripts/windows/` (service.pyw, kur-otomatik-baslat.ps1): kendi Windows PC'de oturum açılışında konsolsuz (`pythonw`) otomatik başlatma (Görev Zamanlayıcı); ilan.gov.tr tarayıcı/taskkill alt süreçleri `CREATE_NO_WINDOW` ile açılır; Pi'ye geçiş adımları [[deploy]] içinde.
 
 ---
 

@@ -17,6 +17,9 @@ from app.domain.schemas import AnnouncementCreate
 from app.scrapers.base import BaseScraper
 from app.scrapers.registry import ScraperRegistry
 
+# Windows'ta alt süreçler (tarayıcı, taskkill) için konsol penceresi/görev çubuğu simgesi açılmasın
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 @ScraperRegistry.register
 class IlanGovTrScraper(BaseScraper):
@@ -67,13 +70,20 @@ class IlanGovTrScraper(BaseScraper):
                 ["taskkill", "/PID", str(process.pid), "/T", "/F"],  # noqa: S607
                 capture_output=True,
                 check=False,
+                creationflags=_NO_WINDOW,
             )
         else:
             process.kill()
 
     def _run_browser_blocking(self, cmd: List[str]) -> bytes:
         """Tarayıcıyı çalıştırıp çıktısını döner; zaman aşımında süreç ağacını öldürür."""
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)  # noqa: S603  # nosec B603
+        process = subprocess.Popen(  # noqa: S603  # nosec B603
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            creationflags=_NO_WINDOW,
+        )
         try:
             stdout, _ = process.communicate(timeout=ScraperLimits.BROWSER_TIMEOUT_SECONDS)
         except subprocess.TimeoutExpired:

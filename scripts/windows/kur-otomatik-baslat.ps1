@@ -12,9 +12,12 @@ if ($Kaldir) {
     exit 0
 }
 
-$script = Resolve-Path (Join-Path $PSScriptRoot "baslat-gizli.ps1")
-$action = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
+$root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+$pyw = Join-Path $root "venv\Scripts\pythonw.exe"
+if (-not (Test-Path $pyw)) { throw "venv\Scripts\pythonw.exe bulunamadi: $pyw" }
+$service = Join-Path $root "scripts\windows\service.pyw"
+# pythonw dogrudan calistirilir: konsol penceresi / gorev cubugu simgesi acilmaz
+$action = New-ScheduledTaskAction -Execute $pyw -Argument "`"$service`"" -WorkingDirectory $root
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -StartWhenAvailable -MultipleInstances IgnoreNew `
