@@ -13,7 +13,7 @@ from app.core.logging import get_logger
 from app.core.scoring.city_matcher import CityMatcher
 from app.core.scoring.it_field_matcher import ITFieldMatcher
 from app.core.scoring.strategy import KPSSScoreMatcher
-from app.core.security import is_http_url
+from app.core.security import escape_html, is_http_url
 from app.domain.models import Announcement
 from app.domain.schemas import (
     AnnouncementCreate,
@@ -46,6 +46,9 @@ class AnnouncementService:
         self.orchestrator = orchestrator or ScraperOrchestrator()
         self.notifier = notifier or TelegramNotifier()
         self._cycle_lock = asyncio.Lock()
+        # Portal başına art arda hata sayısı ve uyarısı gönderilmiş portallar (bellekte; yeniden başlatmada sıfırlanır)
+        self._failure_streak: Dict[str, int] = {}
+        self._alerted_portals: set = set()
         self._background_task: Optional["asyncio.Task[None]"] = None
         # Son tamamlanan (veya hata veren) döngünün özeti; arayüz durum sorgusu için
         self.last_cycle: Optional[Dict[str, Any]] = None
@@ -176,11 +179,45 @@ class AnnouncementService:
 
         # Bildirimler kayıt aşamasından ayrıdır: başarısız gönderimler sonraki taramada yeniden denenir
         await self._notify_pending(is_first_run)
+        await self._alert_portal_failures(statuses)
 
         logger.info(
             MessageStrings.ALL_SCRAPERS_COMPLETED.format(total_new=total_new_saved)
         )
         return total_new_saved, statuses
+
+    async def _alert_portal_failures(self, statuses: List[ScraperRunStatus]) -> None:
+        """Bir portal art arda eşik kadar taramada hata verirse TEK uyarı, düzelince TEK bilgi mesajı gönderir.
+
+        Gözetimsiz çalışan bir sunucuda portal sessizce bozulursa yeni ilanlar fark edilmeden kaçar;
+        bu yüzden arıza ve toparlanma Telegram'a bildirilir. Mesaj her taramada tekrarlanmaz.
+        """
+        threshold = settings.PORTAL_FAILURE_ALERT_THRESHOLD
+        for status in statuses:
+            key = str(getattr(status.portal_key, "value", status.portal_key))
+            if status.status == "error":
+                self._failure_streak[key] = self._failure_streak.get(key, 0) + 1
+                streak = self._failure_streak[key]
+                if threshold > 0 and streak >= threshold and key not in self._alerted_portals:
+                    error_text = escape_html((status.error_message or "bilinmeyen hata")[:200])
+                    logger.warning(
+                        MessageStrings.PORTAL_DOWN_LOG.format(count=streak, portal=status.portal_name, error=error_text)
+                    )
+                    if await self.notifier.send_text(
+                        NotificationStrings.PORTAL_DOWN.format(
+                            portal=escape_html(status.portal_name), count=streak, error=error_text
+                        )
+                    ):
+                        self._alerted_portals.add(key)
+            else:
+                was_down = key in self._alerted_portals
+                self._failure_streak[key] = 0
+                self._alerted_portals.discard(key)
+                if was_down:
+                    logger.info(MessageStrings.PORTAL_RECOVERED_LOG.format(portal=status.portal_name))
+                    await self.notifier.send_text(
+                        NotificationStrings.PORTAL_RECOVERED.format(portal=escape_html(status.portal_name))
+                    )
 
     async def _notify_pending(self, is_first_run: bool) -> None:
         """Bildirilmemiş yeni ilanları öncelik sırasıyla, hız sınırına uyarak Telegram'a iletir.

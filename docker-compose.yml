@@ -3,6 +3,8 @@ services:
     build: .
     container_name: kpss-atama-takip
     restart: unless-stopped
+    # Chromium (İlan.gov.tr) alt süreçlerinin zombi kalmasını önler; uzun süre çalışan sunucu için önemli
+    init: true
     ports:
       # Varsayılan olarak yalnızca yerel makineden erişilir. Dışarı açmak için
       # bir ters vekil (HTTPS) ve .env içinde API_KEY kullanın.
@@ -21,6 +23,12 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # Konteyner stdout logları diski doldurmasın
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       # Sahiplik: uid 1000 (konteynerdeki 'app' kullanıcısı) yazabilmelidir
       - ./data:/app/data

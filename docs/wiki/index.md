@@ -20,5 +20,8 @@ Hoş geldiniz. Bu dizin, KPSS Atama Takip Projesi'nin mimarisini, veri kaynaklar
 ### 5. Güvenlik
 * [[security]]: API anahtarı, XSS/SSRF korumaları, TLS, CORS, güvenlik başlıkları ve kapsayıcı sertleştirmesi.
 
-### 6. Kayıt Defteri & Günlük
+### 6. Dağıtım
+* [[deploy-oracle]]: Oracle Cloud Always Free üzerinde 7/24 çalıştırma, Telegram kurulumu, yedek ve sorun giderme.
+
+### 7. Kayıt Defteri & Günlük
 * [[log]]: Proje üzerinde gerçekleştirilen tüm önemli kararlar, mimari güncellemeler ve veri ekleme kayıtları.

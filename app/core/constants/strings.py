@@ -38,6 +38,8 @@ class MessageStrings:
     TELEGRAM_DISABLED = "Telegram bildirimleri pasif durumda veya token girilmemiş."
     NOTIFY_BASELINE = "İlk çalıştırma: {count} mevcut ilan bildirim gönderilmeden işaretlendi."
     NOTIFY_SUMMARY = "Bildirim: {sent} ilan tek tek, {summarized} ilan özet olarak iletildi."
+    PORTAL_DOWN_LOG = "Portal art arda {count} taramadır hata veriyor: {portal} ({error})"
+    PORTAL_RECOVERED_LOG = "Portal yeniden çalışıyor: {portal}"
     NOTIFY_ABORTED = "Telegram art arda hata verdi, kalan bildirimler sonraki taramaya bırakıldı."
 
 
@@ -83,6 +85,13 @@ class NotificationStrings:
         "✅ Telegram bildirim bağlantısı başarıyla kuruldu!\n"
         "Yeni bir atama veya personel alım ilanı yayınlandığında anında buradan haberdar edileceksiniz."
     )
+    PORTAL_DOWN = (
+        "⚠️ <b>Portal arızası</b>\n"
+        "{portal} art arda <b>{count}</b> taramadır veri alamıyor.\n"
+        "<i>Hata:</i> {error}\n"
+        "Bu süre boyunca bu portaldaki yeni ilanları kaçırıyor olabilirsiniz."
+    )
+    PORTAL_RECOVERED = "✅ <b>{portal}</b> yeniden çalışıyor."
     SUMMARY = (
         "📬 <b>{count} ilan daha eklendi.</b>\n"
         "Hepsini web panelinden inceleyebilirsiniz (öncelikli ilanlar yukarıda gönderildi)."

@@ -41,6 +41,8 @@ class AppSettings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
     TELEGRAM_NOTIFICATIONS_ENABLED: bool = False
+    # Bir portal art arda bu kadar taramada hata verirse tek bir Telegram uyarısı gönderilir (0: kapalı)
+    PORTAL_FAILURE_ALERT_THRESHOLD: int = 3
     # Boş veritabanında ilk taramada bulunan mevcut ilanlar için bildirim gönderilsin mi (varsayılan: hayır)
     NOTIFY_ON_FIRST_RUN: bool = False
     # Tek taramada tek tek gönderilecek en fazla bildirim; fazlası tek özet mesajıyla bildirilir
@@ -49,6 +51,12 @@ class AppSettings(BaseSettings):
     TELEGRAM_SEND_INTERVAL_SECONDS: float = 1.1
     # Gönderilemeyen bildirimler yalnızca bu kadar saat içinde yeniden denenir (eski ilanlar yağmuru olmasın)
     TELEGRAM_RETRY_WINDOW_HOURS: int = 24
+
+    # Veritabanı yedekleme (günlük, TRT saatiyle DB_BACKUP_HOUR; en yeni DB_BACKUP_KEEP yedek tutulur)
+    DB_BACKUP_ENABLED: bool = True
+    DB_BACKUP_DIR: str = "data/backups"
+    DB_BACKUP_KEEP: int = 7
+    DB_BACKUP_HOUR: int = 4
 
     # Kazıma & Zamanlama Parametreleri
     SCRAPER_INTERVAL_MINUTES: int = 15

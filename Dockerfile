@@ -30,6 +30,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=app:app app/ ./app/
 COPY --chown=app:app web/ ./web/
 COPY --chown=app:app run.py .
+COPY --chown=app:app scripts/ ./scripts/
 
 # Veri ve log dizinleri (volume bağlanan dizinler için sahiplik)
 RUN mkdir -p data/documents logs && chown -R app:app data logs

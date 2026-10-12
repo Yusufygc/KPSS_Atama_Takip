@@ -1,0 +1,5 @@
+# Linux sunucuya giden dosyalar her zaman LF satır sonu kullanır (Windows'ta CRLF betikleri bozar)
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.example text eol=lf
